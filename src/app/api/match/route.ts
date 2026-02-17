@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseWatchlistCsv } from "@/lib/csv-parser";
 import { matchFilms } from "@/lib/matcher";
 import { scrapeAll } from "@/scrapers";
+import { fetchFilmMetadata } from "@/lib/tmdb";
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,10 +26,19 @@ export async function POST(request: NextRequest) {
     const screenings = await scrapeAll();
     const matches = matchFilms(watchlist, screenings);
 
+    const enriched = process.env.TMDB_API_KEY
+      ? await Promise.all(
+          matches.map(async (m) => ({
+            ...m,
+            metadata: await fetchFilmMetadata(m.film.title, m.film.year),
+          }))
+        )
+      : matches;
+
     return NextResponse.json({
       watchlistCount: watchlist.length,
       screeningsScraped: screenings.length,
-      matches,
+      matches: enriched,
     });
   } catch (err) {
     console.error("Match API error:", err);

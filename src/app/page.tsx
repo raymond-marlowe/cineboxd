@@ -301,104 +301,157 @@ export default function Home() {
               />
             ) : filteredMatches && filteredMatches.length > 0 ? (
               <div className="grid gap-4">
-                {filteredMatches.map((match, i) => (
-                  <div
-                    key={i}
-                    className="bg-card border border-border rounded-xl p-5 hover:bg-card-hover transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4 mb-3">
-                      <div>
-                        <h3 className="text-lg font-semibold">
-                          {match.film.title}
-                        </h3>
-                        {match.film.year && (
-                          <span className="text-sm text-muted">
-                            {match.film.year}
-                          </span>
+                {filteredMatches.map((match, i) => {
+                  const meta = match.metadata;
+                  return (
+                    <div
+                      key={i}
+                      className="bg-card border border-border rounded-xl p-5 hover:bg-card-hover transition-colors"
+                    >
+                      <div className="flex gap-4 mb-3">
+                        {meta?.posterPath ? (
+                          <img
+                            src={`https://image.tmdb.org/t/p/w185${meta.posterPath}`}
+                            alt={`${match.film.title} poster`}
+                            className="w-24 h-36 object-cover rounded-lg shrink-0"
+                          />
+                        ) : (
+                          <div className="w-24 h-36 bg-background/50 rounded-lg shrink-0 flex items-center justify-center text-muted text-2xl">
+                            🎬
+                          </div>
                         )}
-                      </div>
-                      {match.film.letterboxdUri && (
-                        <a
-                          href={match.film.letterboxdUri}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-muted hover:text-accent transition-colors shrink-0"
-                        >
-                          Letterboxd →
-                        </a>
-                      )}
-                    </div>
 
-                    <div className="grid gap-2">
-                      {match.screenings.map((s, j) => (
-                        <div
-                          key={j}
-                          className="flex items-center justify-between gap-3 text-sm bg-background/50 rounded-lg px-3 py-2"
-                        >
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <span className="text-muted">{s.venue}</span>
-                            <span>
-                              {new Date(s.date + "T00:00:00").toLocaleDateString(
-                                "en-GB",
-                                {
-                                  weekday: "short",
-                                  day: "numeric",
-                                  month: "short",
-                                }
-                              )}
-                            </span>
-                            <span className="font-mono">{s.time}</span>
-                            {s.format && (
-                              <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full font-medium">
-                                {s.format}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-semibold">
+                            {match.film.title}
+                            {match.film.year && (
+                              <span className="text-sm text-muted font-normal ml-2">
+                                ({match.film.year})
                               </span>
                             )}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              onClick={() =>
-                                handleDownloadSingleIcs(s, match.film.title)
-                              }
-                              className="text-muted hover:text-accent transition-colors cursor-pointer"
-                              title="Download ICS"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
+                          </h3>
+
+                          {meta?.director && (
+                            <p className="text-sm text-muted mt-0.5">
+                              Directed by {meta.director}
+                            </p>
+                          )}
+
+                          {meta?.overview && (
+                            <p className="text-sm text-muted mt-1.5 line-clamp-2">
+                              {meta.overview}
+                            </p>
+                          )}
+
+                          <div className="flex items-center gap-3 mt-2 flex-wrap">
+                            {meta?.tmdbRating != null && (
+                              <span
+                                className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                  meta.tmdbRating >= 7
+                                    ? "bg-green-500/20 text-green-400"
+                                    : meta.tmdbRating >= 5
+                                      ? "bg-yellow-500/20 text-yellow-400"
+                                      : "bg-red-500/20 text-red-400"
+                                }`}
                               >
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                <line x1="16" y1="2" x2="16" y2="6" />
-                                <line x1="8" y1="2" x2="8" y2="6" />
-                                <line x1="3" y1="10" x2="21" y2="10" />
-                              </svg>
-                            </button>
-                            {s.bookingUrl ? (
+                                TMDB {meta.tmdbRating.toFixed(1)}
+                              </span>
+                            )}
+                            {meta?.imdbId && (
                               <a
-                                href={s.bookingUrl}
+                                href={`https://www.imdb.com/title/${meta.imdbId}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-accent hover:underline font-medium"
+                                className="text-xs font-bold bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded hover:bg-yellow-500/30 transition-colors"
                               >
-                                Book
+                                IMDb
                               </a>
-                            ) : (
-                              <span className="text-muted text-xs">
-                                Sold out
-                              </span>
+                            )}
+                            {match.film.letterboxdUri && (
+                              <a
+                                href={match.film.letterboxdUri}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded hover:bg-emerald-500/30 transition-colors"
+                              >
+                                Letterboxd
+                              </a>
                             )}
                           </div>
                         </div>
-                      ))}
+                      </div>
+
+                      <div className="grid gap-2">
+                        {match.screenings.map((s, j) => (
+                          <div
+                            key={j}
+                            className="flex items-center justify-between gap-3 text-sm bg-background/50 rounded-lg px-3 py-2"
+                          >
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className="text-muted">{s.venue}</span>
+                              <span>
+                                {new Date(s.date + "T00:00:00").toLocaleDateString(
+                                  "en-GB",
+                                  {
+                                    weekday: "short",
+                                    day: "numeric",
+                                    month: "short",
+                                  }
+                                )}
+                              </span>
+                              <span className="font-mono">{s.time}</span>
+                              {s.format && (
+                                <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full font-medium">
+                                  {s.format}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                onClick={() =>
+                                  handleDownloadSingleIcs(s, match.film.title)
+                                }
+                                className="text-muted hover:text-accent transition-colors cursor-pointer"
+                                title="Download ICS"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                  <line x1="16" y1="2" x2="16" y2="6" />
+                                  <line x1="8" y1="2" x2="8" y2="6" />
+                                  <line x1="3" y1="10" x2="21" y2="10" />
+                                </svg>
+                              </button>
+                              {s.bookingUrl ? (
+                                <a
+                                  href={s.bookingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-accent hover:underline font-medium"
+                                >
+                                  Book
+                                </a>
+                              ) : (
+                                <span className="text-muted text-xs">
+                                  Sold out
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-16 text-muted">
