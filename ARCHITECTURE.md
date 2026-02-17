@@ -118,7 +118,31 @@ JSON response ──────────────────────
 Same as above, except:
 - The request is `multipart/form-data` with a `csv` field
 - The CSV is parsed by `csv-parser.ts` using PapaParse instead of fetching from Letterboxd
-- The URL does not update with a query parameter
+- After parsing, the watchlist is cached with a random 8-char hex ID (`list-<id>`) and a 24-hour TTL
+- The API returns `listId` in the response; the frontend updates the URL to `/?list=<id>`
+
+### Shared CSV link flow
+
+```
+Browser                          Server (/api/match)
+───────                          ───────────────────
+User opens /?list=abc123
+        │
+        ▼
+POST /api/match
+Content-Type: application/json
+{ "listId": "abc123" }
+        │
+        ├──────── Look up getCached("list-abc123")
+        │         If expired → 410 { error, expired: true }
+        │
+        ▼
+        ├──────── Match + enrich (same as other flows)
+        │
+        ▼
+JSON response ──────────────────── Browser renders results
+{ watchlistCount, screeningsScraped, matches, listId }
+```
 
 ### Multi-user ("Watch together") flow
 
@@ -315,6 +339,12 @@ Film matching happens in `src/lib/matcher.ts` and uses a three-stage pipeline:
 - **What's cached:** `FilmMetadata` objects (poster path, overview, director, rating, IMDb ID)
 - **TTL:** Same 6 hours
 
+### Shared list cache (same `cache.ts`)
+- **Keys:** `list-{8-char-hex-id}` (e.g. `list-a1b2c3d4`)
+- **What's cached:** `WatchlistFilm[]` from a CSV upload
+- **TTL:** 24 hours (via `setCacheWithTTL`)
+- **Created:** When a CSV is uploaded; the ID is returned to the frontend for shareable URLs
+
 ### Rate limit store (`src/lib/rate-limit.ts`)
 - **Storage:** Separate in-memory `Map<string, number[]>` (IP → timestamps)
 - **Window:** 60 seconds (timestamps older than this are pruned)
@@ -400,6 +430,7 @@ No other configuration is needed. The `next.config.ts` is empty — there are no
 - **Venue filtering:** Filter results by cinema
 - **Rate limiting:** 10 requests per minute per IP
 - **Watch together:** Enter 2-5 Letterboxd usernames to find films on all/some watchlists that are currently screening, with shared/partial split and per-user colour indicators
+- **Shareable result URLs:** All results pages have a Share button that copies the current URL. Solo (`?user=`), together (`?users=`), and CSV (`?list=`) results all auto-load from URL on page visit. CSV shared links expire after 24 hours.
 
 ### Scrapers
 

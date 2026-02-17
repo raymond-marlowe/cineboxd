@@ -12,6 +12,8 @@ interface MatchResponse {
   matches: MatchedScreening[];
   userErrors?: Record<string, string>;
   totalUsers?: number;
+  listId?: string;
+  expired?: boolean;
 }
 
 type AppState = "upload" | "loading" | "results";
@@ -32,6 +34,8 @@ function HomeInner() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [username, setUsername] = useState("");
   const [loadingUsername, setLoadingUsername] = useState<string | null>(null);
+
+  const [copied, setCopied] = useState(false);
 
   // Watch together state
   const [mode, setMode] = useState<InputMode>("solo");
@@ -122,10 +126,52 @@ function HomeInner() {
     [router]
   );
 
+  const handleListId = useCallback(
+    async (listId: string) => {
+      setState("loading");
+      setError(null);
+      setLoadingUsername(null);
+
+      try {
+        const res = await fetch("/api/match", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ listId }),
+        });
+        const json = await res.json();
+
+        if (!res.ok) {
+          if (json.expired) {
+            setError(
+              "This shared link has expired. Ask the person who shared it to upload the CSV again."
+            );
+          } else {
+            setError(json.error || "Something went wrong");
+          }
+          setState("upload");
+          return;
+        }
+
+        setData(json);
+        setState("results");
+      } catch {
+        setError("Failed to connect to server");
+        setState("upload");
+      }
+    },
+    []
+  );
+
   // Auto-submit from URL query param on mount
   useEffect(() => {
+    const listParam = searchParams.get("list");
     const userParam = searchParams.get("user");
     const usersParam = searchParams.get("users");
+
+    if (listParam && state === "upload" && !data) {
+      handleListId(listParam);
+      return;
+    }
 
     if (usersParam && state === "upload" && !data) {
       const names = usersParam.split(",").map(decodeURIComponent).filter((n) => n.length > 0);
@@ -170,11 +216,14 @@ function HomeInner() {
 
       setData(json);
       setState("results");
+      if (json.listId) {
+        router.replace(`?list=${json.listId}`);
+      }
     } catch {
       setError("Failed to connect to server");
       setState("upload");
     }
-  }, []);
+  }, [router]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -314,6 +363,12 @@ function HomeInner() {
     const content = generateIcsFile(events);
     downloadIcs(content, "cineboxd-screenings.ics");
   }, [filteredMatches]);
+
+  const handleShare = useCallback(() => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, []);
 
   const isTogether = data?.totalUsers != null;
 
@@ -762,6 +817,27 @@ function HomeInner() {
                       </svg>
                       Export all
                     </button>
+
+                    <button
+                      onClick={handleShare}
+                      className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-3 py-2 text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
+                      title="Copy shareable link"
+                    >
+                      {copied ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="18" cy="5" r="3" />
+                          <circle cx="6" cy="12" r="3" />
+                          <circle cx="18" cy="19" r="3" />
+                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                        </svg>
+                      )}
+                      {copied ? "Link copied!" : "Share"}
+                    </button>
                   </div>
                 </div>
 
@@ -896,6 +972,27 @@ function HomeInner() {
                         <line x1="12" y1="15" x2="12" y2="3" />
                       </svg>
                       Export all
+                    </button>
+
+                    <button
+                      onClick={handleShare}
+                      className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-3 py-2 text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
+                      title="Copy shareable link"
+                    >
+                      {copied ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="18" cy="5" r="3" />
+                          <circle cx="6" cy="12" r="3" />
+                          <circle cx="18" cy="19" r="3" />
+                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                        </svg>
+                      )}
+                      {copied ? "Link copied!" : "Share"}
                     </button>
                   </div>
                 </div>

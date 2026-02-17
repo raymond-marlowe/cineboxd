@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { parseWatchlistCsv, normalizeTitle } from "@/lib/csv-parser";
 import {
   fetchWatchlistByUsername,
@@ -8,7 +9,10 @@ import { matchFilms } from "@/lib/matcher";
 import { scrapeAll } from "@/scrapers";
 import { fetchFilmMetadata } from "@/lib/tmdb";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getCached, setCacheWithTTL } from "@/lib/cache";
 import { WatchlistFilm, MatchedScreening } from "@/lib/types";
+
+const LIST_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function POST(request: NextRequest) {
   // Rate limit check
@@ -29,37 +33,52 @@ export async function POST(request: NextRequest) {
 
   try {
     let watchlist: WatchlistFilm[];
+    let listId_: string | undefined;
 
     const contentType = request.headers.get("content-type") ?? "";
 
     if (contentType.includes("application/json")) {
       const body = await request.json();
 
-      // Multi-user flow
-      if (Array.isArray(body.usernames)) {
-        return handleMultiUser(body.usernames);
-      }
-
-      // Single username flow
-      const username = typeof body.username === "string" ? body.username.trim() : "";
-
-      if (!username) {
-        return NextResponse.json(
-          { error: "Please enter a username" },
-          { status: 400 }
-        );
-      }
-
-      try {
-        watchlist = await fetchWatchlistByUsername(username);
-      } catch (err) {
-        if (err instanceof LetterboxdError) {
+      // Cached list flow
+      if (typeof body.listId === "string") {
+        const listId = body.listId;
+        const cached = getCached<WatchlistFilm[]>("list-" + listId);
+        if (!cached) {
           return NextResponse.json(
-            { error: err.message },
-            { status: err.statusCode }
+            { error: "This shared link has expired", expired: true },
+            { status: 410 }
           );
         }
-        throw err;
+        watchlist = cached;
+        listId_ = listId;
+      }
+      // Multi-user flow
+      else if (Array.isArray(body.usernames)) {
+        return handleMultiUser(body.usernames);
+      }
+      // Single username flow
+      else {
+        const username = typeof body.username === "string" ? body.username.trim() : "";
+
+        if (!username) {
+          return NextResponse.json(
+            { error: "Please enter a username" },
+            { status: 400 }
+          );
+        }
+
+        try {
+          watchlist = await fetchWatchlistByUsername(username);
+        } catch (err) {
+          if (err instanceof LetterboxdError) {
+            return NextResponse.json(
+              { error: err.message },
+              { status: err.statusCode }
+            );
+          }
+          throw err;
+        }
       }
     } else {
       // CSV upload flow
@@ -85,6 +104,10 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+
+      // Cache the parsed watchlist with a shareable ID
+      listId_ = crypto.randomBytes(4).toString("hex");
+      setCacheWithTTL("list-" + listId_, watchlist, LIST_TTL_MS);
     }
 
     const screenings = await scrapeAll();
@@ -103,6 +126,7 @@ export async function POST(request: NextRequest) {
       watchlistCount: watchlist.length,
       screeningsScraped: screenings.length,
       matches: enriched,
+      ...(listId_ ? { listId: listId_ } : {}),
     });
   } catch (err) {
     console.error("Match API error:", err);
