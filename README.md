@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# cineboxd
 
-## Getting Started
+Find your Letterboxd watchlist films screening at London's independent cinemas.
 
-First, run the development server:
+Enter your Letterboxd username (or upload a CSV export) and see which films on your watchlist are currently showing at Prince Charles Cinema, Barbican, ICA, Close-Up Film Centre, and Rio Cinema — with posters, ratings, booking links, and calendar export.
+
+<!-- ![Screenshot](screenshot.png) -->
+
+## Quick start
 
 ```bash
+npm install
+echo "TMDB_API_KEY=your_key_here" > .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Get a free TMDB API key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api). The app works without it, but you won't see posters or ratings.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Open [localhost:3000](http://localhost:3000).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## How it works
 
-## Learn More
+1. Fetches your public Letterboxd watchlist (or parses your CSV export)
+2. Scrapes upcoming screenings from 5 London cinemas in parallel
+3. Matches films using fuzzy title matching with year validation
+4. Enriches results with posters, directors, and ratings from TMDB
 
-To learn more about Next.js, take a look at the following resources:
+## Features
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Username or CSV** — enter your Letterboxd username or upload a watchlist CSV
+- **Bookmarkable** — URLs like `/?user=yourname` auto-load results
+- **Calendar export** — download screenings as ICS files
+- **Two views** — list view with film cards or monthly calendar view
+- **Venue filtering** — filter results by cinema
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Architecture
 
-## Deploy on Vercel
+See [ARCHITECTURE.md](ARCHITECTURE.md) for full technical documentation: data flow, scraper details, matching logic, caching, deployment, and current status.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deploy
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Push to GitHub and import in [Vercel](https://vercel.com). Set `TMDB_API_KEY` in environment variables. That's it.
+
+## Built with
+
+Next.js, React, Tailwind CSS, Cheerio, Fuse.js, TMDB API.

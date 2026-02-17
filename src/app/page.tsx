@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { MatchedScreening, Screening } from "@/lib/types";
 import { generateIcsEvent, generateIcsFile, downloadIcs } from "@/lib/ics";
 import Calendar from "@/components/calendar";
@@ -14,13 +15,69 @@ interface MatchResponse {
 type AppState = "upload" | "loading" | "results";
 type ViewMode = "list" | "calendar";
 
-export default function Home() {
+function HomeInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const [state, setState] = useState<AppState>("upload");
   const [data, setData] = useState<MatchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [venueFilter, setVenueFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [username, setUsername] = useState("");
+  const [loadingUsername, setLoadingUsername] = useState<string | null>(null);
+
+  const handleUsername = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) {
+        setError("Please enter a username");
+        return;
+      }
+
+      setState("loading");
+      setError(null);
+      setLoadingUsername(trimmed);
+
+      try {
+        const res = await fetch("/api/match", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: trimmed }),
+        });
+        const json = await res.json();
+
+        if (!res.ok) {
+          setError(json.error || "Something went wrong");
+          setState("upload");
+          setLoadingUsername(null);
+          return;
+        }
+
+        setData(json);
+        setState("results");
+        setLoadingUsername(null);
+        router.replace(`?user=${encodeURIComponent(trimmed)}`);
+      } catch {
+        setError("Failed to connect to server");
+        setState("upload");
+        setLoadingUsername(null);
+      }
+    },
+    [router]
+  );
+
+  // Auto-submit from URL query param on mount
+  useEffect(() => {
+    const userParam = searchParams.get("user");
+    if (userParam && state === "upload" && !data) {
+      setUsername(userParam);
+      handleUsername(userParam);
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.name.endsWith(".csv")) {
@@ -30,6 +87,7 @@ export default function Home() {
 
     setState("loading");
     setError(null);
+    setLoadingUsername(null);
 
     const formData = new FormData();
     formData.append("csv", file);
@@ -76,6 +134,9 @@ export default function Home() {
     setError(null);
     setVenueFilter("all");
     setViewMode("list");
+    setUsername("");
+    setLoadingUsername(null);
+    router.replace("/");
   };
 
   const venues = data
@@ -134,7 +195,7 @@ export default function Home() {
               onClick={reset}
               className="text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
             >
-              Upload new file
+              New search
             </button>
           )}
         </div>
@@ -148,9 +209,38 @@ export default function Home() {
                 Find your watchlist in London cinemas
               </h2>
               <p className="text-muted max-w-md mx-auto">
-                Upload your Letterboxd watchlist CSV and see which films are
-                currently screening at London&apos;s repertory cinemas.
+                Enter your Letterboxd username to see which films on your
+                watchlist are currently screening at London&apos;s repertory
+                cinemas.
               </p>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleUsername(username);
+              }}
+              className="w-full max-w-lg flex gap-3"
+            >
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your Letterboxd username"
+                className="flex-1 bg-card border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+              />
+              <button
+                type="submit"
+                className="bg-accent text-background font-medium px-6 py-3 rounded-lg hover:bg-accent/90 transition-colors cursor-pointer shrink-0"
+              >
+                Search
+              </button>
+            </form>
+
+            <div className="flex items-center gap-3 w-full max-w-lg">
+              <div className="flex-1 border-t border-border" />
+              <span className="text-sm text-muted">or</span>
+              <div className="flex-1 border-t border-border" />
             </div>
 
             <div
@@ -160,19 +250,20 @@ export default function Home() {
                 setDragOver(true);
               }}
               onDragLeave={() => setDragOver(false)}
-              className={`w-full max-w-lg border-2 border-dashed rounded-xl p-12 text-center transition-colors cursor-pointer ${
+              className={`w-full max-w-lg border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
                 dragOver
                   ? "border-accent bg-accent/5"
                   : "border-border hover:border-muted"
               }`}
               onClick={() => document.getElementById("csv-input")?.click()}
             >
-              <div className="space-y-3">
-                <div className="text-4xl">🎬</div>
-                <p className="text-foreground font-medium">
-                  Drop your watchlist CSV here
+              <div className="space-y-1">
+                <p className="text-muted text-sm font-medium">
+                  Upload a CSV export instead
                 </p>
-                <p className="text-sm text-muted">or click to browse</p>
+                <p className="text-xs text-muted/70">
+                  Drop your watchlist CSV here or click to browse
+                </p>
               </div>
               <input
                 id="csv-input"
@@ -183,25 +274,11 @@ export default function Home() {
               />
             </div>
 
-            {error && (
-              <p className="text-red-400 text-sm">{error}</p>
-            )}
+            {error && <p className="text-red-400 text-sm">{error}</p>}
 
             <div className="text-sm text-muted space-y-1 text-center">
               <p>
-                Export your watchlist from{" "}
-                <a
-                  href="https://letterboxd.com/settings/data/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-accent hover:underline"
-                >
-                  Letterboxd Settings → Import & Export
-                </a>
-              </p>
-              <p>
-                Currently checking: Prince Charles, Close-Up, ICA,
-                Barbican, Rio
+                Currently checking: Prince Charles, Close-Up, ICA, Barbican, Rio
               </p>
             </div>
           </div>
@@ -211,7 +288,9 @@ export default function Home() {
           <div className="flex flex-col items-center gap-4 py-20">
             <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
             <p className="text-muted">
-              Checking London cinema listings...
+              {loadingUsername
+                ? `Fetching watchlist for ${loadingUsername}...`
+                : "Checking London cinema listings..."}
             </p>
           </div>
         )}
@@ -465,5 +544,13 @@ export default function Home() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense>
+      <HomeInner />
+    </Suspense>
   );
 }

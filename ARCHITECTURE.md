@@ -1,0 +1,379 @@
+# Cineboxd Architecture
+
+## 1. Project Overview
+
+Cineboxd is a web app that checks whether any films on your Letterboxd watchlist are currently showing at independent cinemas in London. You either enter your Letterboxd username or upload your watchlist as a CSV file. The app then scrapes upcoming screenings from five London cinemas, matches them against your watchlist using fuzzy title matching, and shows you the results with posters, ratings, and booking links. You can also export screenings to your calendar.
+
+## 2. Tech Stack
+
+| Technology | Version | What it does |
+|---|---|---|
+| [Next.js](https://nextjs.org) | 16.1.6 | The web framework — handles both the website (frontend) and the server-side API that processes requests. |
+| [React](https://react.dev) | 19.2.3 | The UI library that renders the interactive interface in the browser. |
+| [TypeScript](https://www.typescriptlang.org) | ^5 | A stricter version of JavaScript that catches bugs by requiring you to declare data types. |
+| [Tailwind CSS](https://tailwindcss.com) | ^4 | A styling system where you write design instructions directly in the HTML (e.g. `text-sm text-muted`). |
+| [Cheerio](https://cheerio.js.org) | ^1.2.0 | Reads and extracts data from HTML pages (used to scrape cinema websites and Letterboxd watchlists). |
+| [Fuse.js](https://www.fusejs.io) | ^7.1.0 | A fuzzy search library — finds approximate matches between film titles even when spelling differs slightly. |
+| [PapaParse](https://www.papaparse.com) | ^5.5.3 | Parses CSV (spreadsheet) files — used to read the Letterboxd watchlist export. |
+| [TMDB API](https://developer.themoviedb.org) | v3 | A free movie database API — provides poster images, plot summaries, directors, and ratings. |
+| [Vercel](https://vercel.com) | — | The hosting platform where the app runs in production. |
+| [Geist](https://vercel.com/font) | — | The font used throughout the interface (loaded via `next/font`). |
+
+## 3. Project Structure
+
+```
+cineboxd/
+├── src/
+│   ├── app/                          # Next.js app router (pages + API)
+│   │   ├── api/
+│   │   │   └── match/
+│   │   │       └── route.ts          # POST /api/match — main API endpoint
+│   │   ├── about/
+│   │   │   └── page.tsx              # /about — static about page
+│   │   ├── globals.css               # CSS custom properties (colors, fonts)
+│   │   ├── layout.tsx                # Root HTML layout, metadata, footer
+│   │   └── page.tsx                  # / — main page (input, results, calendar)
+│   │
+│   ├── components/
+│   │   └── calendar.tsx              # Monthly calendar view for screenings
+│   │
+│   ├── lib/                          # Shared utilities
+│   │   ├── types.ts                  # TypeScript interfaces (WatchlistFilm, Screening, etc.)
+│   │   ├── cache.ts                  # In-memory cache with 6-hour TTL
+│   │   ├── csv-parser.ts             # Parses Letterboxd CSV exports into WatchlistFilm[]
+│   │   ├── letterboxd-rss.ts         # Fetches watchlist from Letterboxd by username (HTML scraping)
+│   │   ├── matcher.ts                # Fuzzy film title matching (exact → Fuse.js → token overlap)
+│   │   ├── tmdb.ts                   # TMDB API client (posters, ratings, director, IMDb ID)
+│   │   ├── rate-limit.ts             # In-memory sliding-window rate limiter (10 req/60s per IP)
+│   │   └── ics.ts                    # Generates ICS calendar files for screenings
+│   │
+│   └── scrapers/                     # Cinema listing scrapers
+│       ├── index.ts                  # Runs all scrapers in parallel, collects results
+│       ├── prince-charles.ts         # Prince Charles Cinema (HTML scraping)
+│       ├── close-up.ts               # Close-Up Film Centre (HTML scraping)
+│       ├── ica.ts                    # ICA Cinema (HTML scraping)
+│       ├── barbican.ts               # Barbican Cinema (HTML scraping)
+│       ├── rio.ts                    # Rio Cinema (embedded JSON extraction)
+│       └── picturehouse.ts           # Picturehouse Cinemas (DISABLED — API unreliable)
+│
+├── .env.local                        # Environment variables (TMDB_API_KEY)
+├── next.config.ts                    # Next.js configuration (currently empty)
+├── tsconfig.json                     # TypeScript compiler configuration
+├── postcss.config.mjs                # PostCSS config (Tailwind plugin)
+├── package.json                      # Dependencies and scripts
+└── ARCHITECTURE.md                   # This file
+```
+
+## 4. Data Flow
+
+### Username flow
+
+```
+Browser                          Server (/api/match)                    External
+───────                          ───────────────────                    ────────
+User types username
+and clicks Search
+        │
+        ▼
+POST /api/match
+Content-Type: application/json
+{ "username": "alice" }
+        │
+        ├──────── Rate limit check (rate-limit.ts) ──── 429 if exceeded
+        │
+        ▼
+        ├──────── Fetch watchlist (letterboxd-rss.ts) ──── GET letterboxd.com/alice/watchlist/
+        │         Parse HTML with Cheerio                  GET .../page/2/, /page/3/, etc.
+        │         Extract data-item-name, data-target-link
+        │         → WatchlistFilm[]
+        │
+        ▼
+        ├──────── Scrape cinemas (scrapers/index.ts) ──── GET princecharlescinema.com/...
+        │         All 5 scrapers run in parallel           GET closeupfilmcentre.com/...
+        │         Failed scrapers are silently skipped     GET ica.art/...
+        │         Results cached for 6 hours               GET barbican.org.uk/...
+        │         → Screening[]                            GET riocinema.org.uk/...
+        │
+        ▼
+        ├──────── Match films (matcher.ts)
+        │         1. Exact normalized title match
+        │         2. Fuse.js fuzzy match (threshold 0.15)
+        │         3. Token overlap check (≥60%)
+        │         4. Year validation
+        │         → MatchedScreening[]
+        │
+        ▼
+        ├──────── Enrich with TMDB (tmdb.ts) ──────────── GET api.themoviedb.org/3/search/movie
+        │         Fetch poster, director, rating             GET api.themoviedb.org/3/movie/{id}
+        │         Cached for 6 hours
+        │         → MatchedScreening[] with metadata
+        │
+        ▼
+JSON response ─────────────────────────────────────────── Browser renders results
+{ watchlistCount, screeningsScraped, matches }             URL updates to /?user=alice
+```
+
+### CSV flow
+
+Same as above, except:
+- The request is `multipart/form-data` with a `csv` field
+- The CSV is parsed by `csv-parser.ts` using PapaParse instead of fetching from Letterboxd
+- The URL does not update with a query parameter
+
+### Files involved at each step
+
+| Step | Files |
+|---|---|
+| Browser input + submit | `page.tsx` |
+| API entry point + rate limiting | `api/match/route.ts`, `rate-limit.ts` |
+| Watchlist from username | `letterboxd-rss.ts` |
+| Watchlist from CSV | `csv-parser.ts` |
+| Cinema scraping | `scrapers/index.ts`, `prince-charles.ts`, `close-up.ts`, `ica.ts`, `barbican.ts`, `rio.ts` |
+| Scraper caching | `cache.ts` |
+| Film matching | `matcher.ts`, `csv-parser.ts` (for `normalizeTitle`) |
+| TMDB enrichment | `tmdb.ts`, `cache.ts` |
+| Results display | `page.tsx`, `calendar.tsx` |
+| ICS export | `ics.ts` (called from `page.tsx`) |
+
+## 5. Scrapers
+
+### Prince Charles Cinema — ENABLED
+
+- **URL:** `https://www.princecharlescinema.com/next-7-days/`
+- **Method:** HTML scraping with Cheerio
+- **Selectors:**
+  - `.day` — day container
+  - `.day h4` — date header (e.g. "Wednesday 18 Feb 2026" or "Today")
+  - `.performance-dayslist` — individual screening
+  - `.leftsideperf a` — film title
+  - `.time` — showtime (12h format, e.g. "2:45 pm")
+  - `.movietag .tag` — format tags (e.g. "35mm")
+  - `a.film_book_button` — booking link
+- **Year extraction:** From title suffix like "(1973)"
+- **Returns:** Title, year, date, time, venue, booking URL, format
+- **Limitations:** Relies on "next 7 days" page structure; format tags may not always be present.
+- **Reliability:** High — stable HTML structure.
+
+### Close-Up Film Centre — ENABLED
+
+- **URL:** `https://www.closeupfilmcentre.com/film_programmes/`
+- **Method:** HTML scraping with Cheerio
+- **Selectors:**
+  - `.inner_block_2_r_block div` — calendar entries containing date+time text and a link
+- **Date/time parsing:** Regex on text like "Tue 17 Feb 8:15pm" (handles both `.` and `:` separators)
+- **Returns:** Title, date, time, venue, booking URL (prefixed with base URL)
+- **Limitations:** No year or format data. Year is inferred from current date. The selector is fragile — depends on specific div nesting.
+- **Reliability:** Medium — small venue with infrequent site changes, but the selectors are not very specific.
+
+### ICA Cinema — ENABLED
+
+- **URL:** `https://www.ica.art/next-7-days`
+- **Method:** HTML scraping with Cheerio
+- **Selectors:**
+  - `.item.films` — film items
+  - `.docket-date` — date headers (found by walking backwards through siblings, up to 30 elements)
+  - `.title` — film title text
+  - `a[href^='/films/']` — booking link
+  - `.time-slot` — showtime(s) per film
+- **Title cleaning:** Strips "UK PREMIERE", "WORLD PREMIERE", "PREVIEW" prefixes
+- **Returns:** Title, date, time, venue, booking URL (prefixed with `https://www.ica.art`)
+- **Limitations:** No year or format data. The backwards-sibling walk for dates is fragile — if ICA restructures their HTML, dates may default to today. Multiple time slots per film each become separate Screening entries.
+- **Reliability:** Medium — the date-finding heuristic is the weakest part.
+
+### Barbican Cinema — ENABLED
+
+- **URL:** `https://www.barbican.org.uk/whats-on/cinema`
+- **Method:** HTML scraping with Cheerio
+- **Selectors:**
+  - `.cinema-listing-card` — film cards
+  - `.cinema-listing-card__title` — title (may have smart quotes)
+  - `.cinema-instance-list` — date section within a card
+  - `.cinema-instance-list__title` — date header
+  - `.cinema-instance-list__instance a` — booking link (text is the time)
+- **Title cleaning:** Strips surrounding quotes (regular and smart quotes)
+- **Year extraction:** From title suffix like "(1973)"
+- **Time parsing:** Handles both `.` and `:` separators (e.g. "19.30" or "19:30")
+- **Returns:** Title, year, date, time, venue, booking URL
+- **Limitations:** No format data. BEM class names are specific and stable but could change in a redesign.
+- **Reliability:** High — well-structured BEM markup.
+
+### Rio Cinema — ENABLED
+
+- **URL:** `https://riocinema.org.uk/Rio.dll/WhatsOn`
+- **Method:** Embedded JSON extraction (not traditional HTML scraping)
+- **Data source:** The page contains `var Events = \n{JSON}` — the scraper finds this line and parses the next line as JSON
+- **JSON structure:**
+  ```
+  { Events: [{ Title, Year, Tags: [{ Format }], Performances: [{ StartDate, StartTimeAndNotes, IsSoldOut, URL }] }] }
+  ```
+- **Title transformation:** Titles are UPPERCASE in the data — converted to Title Case
+- **Returns:** Title, year, date, time, venue, booking URL (prefixed with `https://riocinema.org.uk/Rio.dll/`), format
+- **Sold out handling:** Sets `bookingUrl` to `null` when `IsSoldOut === "Y"`
+- **Limitations:** Depends on the `var Events =` pattern existing in the HTML. If Rio changes their frontend framework, this breaks entirely.
+- **Reliability:** High — structured data is more reliable than CSS selectors, but the extraction method is fragile.
+
+### Picturehouse Cinemas — DISABLED
+
+- **Planned API:** `POST https://www.picturehouses.com/api/scheduled-movies-ajax`
+- **Body:** `cinema_id=010` (Hackney), `022` (Central), `016` (Gate), etc.
+- **Headers:** `Content-Type: application/x-www-form-urlencoded`, `X-Requested-With: XMLHttpRequest`
+- **Status:** Disabled because API data did not match actual website listings, and booking URLs were invalid.
+- **To re-enable:** Verify API matches website, fix booking URL format, add back to `scrapers/index.ts`.
+
+### Everyman Cinema — NOT IMPLEMENTED
+
+- **Reason:** The site uses Gatsby with client-side rendering. Showtimes are loaded via internal APIs that would need reverse-engineering. Not scrapable with simple `fetch` + Cheerio.
+
+## 6. Matching Logic
+
+Film matching happens in `src/lib/matcher.ts` and uses a three-stage pipeline:
+
+### Stage 1: Exact normalized match
+- Both the watchlist title and screening title are normalized: lowercased, trimmed, non-word characters removed (via `normalizeTitle` in `csv-parser.ts`)
+- A `Map<normalizedTitle, Screening[]>` is built from all screenings
+- Direct lookup — instant, no false positives
+
+### Stage 2: Fuzzy match with Fuse.js
+- Only runs if Stage 1 found nothing
+- **Fuse.js threshold: 0.15** (strict — 0 is exact, 1 matches anything; was originally 0.3)
+- Searches the normalized title against all screening titles
+- Each fuzzy result is then validated with the token overlap check (Stage 3)
+
+### Stage 3: Token overlap validation
+- Prevents false positives like "White Nights" matching "Boogie Nights"
+- **Stop words removed:** the, a, an, of, and, in, at, to, for, is, on
+- Both titles are tokenized into significant words
+- The shorter token list is compared against the longer one
+- **Threshold: ≥60%** of the shorter list's tokens must appear in the longer list
+- If overlap is below 60%, the fuzzy match is rejected
+
+### Year filtering
+- After matching, if both the watchlist film and the screening have a year and they differ, the match is discarded
+- If either side has no year, the match is kept (year is not required)
+
+### Known edge cases
+- Films with very short or very common titles (e.g. "Her", "IT") may match incorrectly or miss matches
+- Remakes with the same title but different year rely on year filtering, which only works if the scraper extracts the year (Close-Up and ICA don't)
+- Foreign-language films may have different English titles on Letterboxd vs. the cinema listing
+- Sequels with similar names (e.g. "Alien" vs "Aliens") are generally handled by the token overlap check but edge cases exist
+
+## 7. Caching
+
+### Scraper cache (`src/lib/cache.ts`)
+- **Storage:** In-memory `Map` (resets on server restart / cold start)
+- **TTL:** 6 hours
+- **Keys:** `prince-charles`, `close-up`, `ica`, `barbican`, `rio`
+- **What's cached:** The full `Screening[]` array from each scraper
+- **Cleanup:** Expired entries are deleted lazily when `getCached()` is called
+
+### TMDB cache (same `cache.ts`)
+- **Keys:** `tmdb-{normalized-title}-{year-or-unknown}` (e.g. `tmdb-cure-1997`)
+- **What's cached:** `FilmMetadata` objects (poster path, overview, director, rating, IMDb ID)
+- **TTL:** Same 6 hours
+
+### Rate limit store (`src/lib/rate-limit.ts`)
+- **Storage:** Separate in-memory `Map<string, number[]>` (IP → timestamps)
+- **Window:** 60 seconds (timestamps older than this are pruned)
+- **Not technically a cache** — tracks request history rather than caching responses
+
+### Important notes
+- All caches are in-memory and reset on every deploy or serverless cold start
+- On Vercel, serverless functions may have separate memory spaces, so cache hits are not guaranteed across invocations
+- There is no cache invalidation mechanism other than TTL expiry
+
+## 8. Environment Variables
+
+| Variable | Required | Description | Where to get it |
+|---|---|---|---|
+| `TMDB_API_KEY` | Yes (for metadata) | API key for The Movie Database. Without it, films display without posters, ratings, or director info. The app still works but results are less rich. | Sign up at [themoviedb.org](https://www.themoviedb.org/settings/api) and request an API key (free for non-commercial use). |
+
+No other environment variables are used. All scraper URLs are hardcoded.
+
+## 9. How to Run Locally
+
+```bash
+# 1. Clone the repository
+git clone <repo-url>
+cd cineboxd
+
+# 2. Install dependencies
+npm install
+
+# 3. Create environment file
+cp .env.local.example .env.local
+# Or create .env.local manually with:
+# TMDB_API_KEY=your_tmdb_api_key_here
+
+# 4. Start development server
+npm run dev
+
+# 5. Open in browser
+# http://localhost:3000
+```
+
+### Available scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start development server with hot reload |
+| `npm run build` | Build for production (also runs TypeScript check) |
+| `npm run start` | Start the production build locally |
+| `npm run lint` | Run ESLint |
+
+## 10. How to Deploy
+
+### Vercel (recommended)
+
+1. Push the repo to GitHub
+2. Import the project in [Vercel](https://vercel.com/new)
+3. Set the environment variable `TMDB_API_KEY` in Vercel's project settings → Environment Variables
+4. Deploy — Vercel auto-detects Next.js and configures the build
+
+### DNS (if using a custom domain)
+
+1. In Vercel → Project Settings → Domains, add your domain
+2. At your DNS provider, add the records Vercel provides (typically a CNAME to `cname.vercel-dns.com`)
+
+### Environment variables in production
+
+| Variable | Where to set |
+|---|---|
+| `TMDB_API_KEY` | Vercel → Project Settings → Environment Variables |
+
+No other configuration is needed. The `next.config.ts` is empty — there are no custom rewrites, redirects, or headers.
+
+## 11. Current Status
+
+### Working
+
+- **Username input:** Enter a Letterboxd username → fetches public watchlist → matches against cinema listings
+- **CSV upload:** Drag-and-drop or click to upload a Letterboxd CSV export
+- **URL bookmarking:** `/?user=username` auto-loads results on page visit
+- **Film matching:** Three-stage matching pipeline (exact, fuzzy, token overlap) with year validation
+- **TMDB enrichment:** Posters, directors, ratings, plot summaries, IMDb/Letterboxd links
+- **Calendar view:** Monthly calendar with screening indicators and day expansion
+- **ICS export:** Download individual or all screenings as calendar events
+- **Venue filtering:** Filter results by cinema
+- **Rate limiting:** 10 requests per minute per IP
+
+### Scrapers
+
+| Cinema | Status | Reliability | Notes |
+|---|---|---|---|
+| Prince Charles Cinema | Active | High | Stable HTML structure, good data quality |
+| Barbican Cinema | Active | High | Well-structured BEM markup |
+| Rio Cinema | Active | High | Structured JSON data, but extraction method is fragile |
+| Close-Up Film Centre | Active | Medium | Fragile CSS selectors, no year data |
+| ICA Cinema | Active | Medium | Date-finding heuristic walks siblings backwards |
+| Picturehouse Cinemas | Disabled | — | API data didn't match website |
+| Everyman Cinema | Not built | — | Client-side rendered, not scrapable |
+
+### Known limitations
+
+- **Cloudflare:** Letterboxd's RSS feed is blocked by Cloudflare challenges from server-side requests. The app scrapes the HTML watchlist page instead, which works but returns 28 films per page (requiring pagination for large watchlists).
+- **Private watchlists:** If a user's Letterboxd watchlist is set to private, the app cannot access it and shows an error.
+- **Scraper fragility:** All scrapers depend on specific HTML structures. Any cinema website redesign will break its scraper until updated.
+- **In-memory cache:** Caches reset on every deploy and are not shared across serverless function instances on Vercel.
+- **Rate limiting:** Also in-memory and per-instance — not globally enforced across Vercel's distributed infrastructure.
+- **No year data from some scrapers:** Close-Up and ICA don't provide release years, which can cause incorrect matches for remakes or films with similar titles.
+- **Fixed 2-hour ICS duration:** All calendar events assume a 2-hour runtime regardless of actual film length.
