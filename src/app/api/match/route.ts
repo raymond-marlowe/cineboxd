@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseWatchlistCsv } from "@/lib/csv-parser";
+import { parseWatchlistCsv, normalizeTitle } from "@/lib/csv-parser";
 import {
   fetchWatchlistByUsername,
   LetterboxdError,
@@ -8,7 +8,7 @@ import { matchFilms } from "@/lib/matcher";
 import { scrapeAll } from "@/scrapers";
 import { fetchFilmMetadata } from "@/lib/tmdb";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { WatchlistFilm } from "@/lib/types";
+import { WatchlistFilm, MatchedScreening } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
   // Rate limit check
@@ -33,8 +33,14 @@ export async function POST(request: NextRequest) {
     const contentType = request.headers.get("content-type") ?? "";
 
     if (contentType.includes("application/json")) {
-      // Username-based flow
       const body = await request.json();
+
+      // Multi-user flow
+      if (Array.isArray(body.usernames)) {
+        return handleMultiUser(body.usernames);
+      }
+
+      // Single username flow
       const username = typeof body.username === "string" ? body.username.trim() : "";
 
       if (!username) {
@@ -105,4 +111,99 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+async function handleMultiUser(rawUsernames: unknown[]) {
+  // Validate: 2-5 non-empty trimmed usernames
+  const usernames = rawUsernames
+    .filter((u): u is string => typeof u === "string")
+    .map((u) => u.trim())
+    .filter((u) => u.length > 0);
+
+  if (usernames.length < 2) {
+    return NextResponse.json(
+      { error: "Please enter at least 2 usernames" },
+      { status: 400 }
+    );
+  }
+  if (usernames.length > 5) {
+    return NextResponse.json(
+      { error: "Maximum 5 usernames allowed" },
+      { status: 400 }
+    );
+  }
+
+  // Fetch all watchlists in parallel
+  const results = await Promise.allSettled(
+    usernames.map((u) => fetchWatchlistByUsername(u))
+  );
+
+  const userErrors: Record<string, string> = {};
+  const userWatchlists = new Map<string, WatchlistFilm[]>();
+
+  for (let i = 0; i < usernames.length; i++) {
+    const result = results[i];
+    if (result.status === "fulfilled") {
+      userWatchlists.set(usernames[i], result.value);
+    } else {
+      const err = result.reason;
+      userErrors[usernames[i]] =
+        err instanceof LetterboxdError
+          ? err.message
+          : "Failed to fetch watchlist";
+    }
+  }
+
+  // If ALL users failed, return 400
+  if (userWatchlists.size === 0) {
+    return NextResponse.json(
+      { error: "Could not fetch any watchlists", userErrors },
+      { status: 400 }
+    );
+  }
+
+  // Build Map<filmKey, Set<username>> and union watchlist
+  const filmUsers = new Map<string, Set<string>>();
+  const filmByKey = new Map<string, WatchlistFilm>();
+
+  for (const [username, films] of userWatchlists) {
+    for (const film of films) {
+      const key = normalizeTitle(film.title) + "|" + (film.year ?? "");
+      if (!filmUsers.has(key)) {
+        filmUsers.set(key, new Set());
+        filmByKey.set(key, film);
+      }
+      filmUsers.get(key)!.add(username);
+    }
+  }
+
+  const unionWatchlist = Array.from(filmByKey.values());
+
+  // Match against screenings
+  const screenings = await scrapeAll();
+  const matches = matchFilms(unionWatchlist, screenings);
+
+  // Annotate each match with users array
+  const annotated: MatchedScreening[] = matches.map((m) => {
+    const key = normalizeTitle(m.film.title) + "|" + (m.film.year ?? "");
+    return { ...m, users: Array.from(filmUsers.get(key) ?? []) };
+  });
+
+  // Enrich with TMDB metadata
+  const enriched = process.env.TMDB_API_KEY
+    ? await Promise.all(
+        annotated.map(async (m) => ({
+          ...m,
+          metadata: await fetchFilmMetadata(m.film.title, m.film.year),
+        }))
+      )
+    : annotated;
+
+  return NextResponse.json({
+    watchlistCount: unionWatchlist.length,
+    screeningsScraped: screenings.length,
+    matches: enriched,
+    userErrors: Object.keys(userErrors).length > 0 ? userErrors : undefined,
+    totalUsers: userWatchlists.size,
+  });
 }

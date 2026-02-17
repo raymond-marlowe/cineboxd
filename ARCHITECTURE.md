@@ -120,6 +120,50 @@ Same as above, except:
 - The CSV is parsed by `csv-parser.ts` using PapaParse instead of fetching from Letterboxd
 - The URL does not update with a query parameter
 
+### Multi-user ("Watch together") flow
+
+```
+Browser                          Server (/api/match)                    External
+───────                          ───────────────────                    ────────
+User enters 2-5 usernames
+and clicks "Find shared films"
+        │
+        ▼
+POST /api/match
+Content-Type: application/json
+{ "usernames": ["alice", "bob"] }
+        │
+        ├──────── Rate limit check ──── 429 if exceeded
+        │
+        ▼
+        ├──────── Fetch all watchlists in parallel ──── Promise.allSettled
+        │         Per-user errors collected in userErrors   (letterboxd-rss.ts)
+        │         If ALL fail → 400
+        │
+        ▼
+        ├──────── Deduplicate films across users
+        │         Map<filmKey, Set<username>>
+        │         filmKey = normalizeTitle(title) + "|" + (year ?? "")
+        │         Build union WatchlistFilm[]
+        │
+        ▼
+        ├──────── Match + enrich (same as single-user)
+        │
+        ▼
+        ├──────── Annotate each match with users[] array
+        │
+        ▼
+JSON response ─────────────────────────────────────────── Browser splits results
+{ watchlistCount, screeningsScraped, matches,              shared = users.length === totalUsers
+  userErrors?, totalUsers }                                partial = users.length < totalUsers
+                                                           URL updates to /?users=alice,bob
+```
+
+**API response fields (multi-user only):**
+- `totalUsers` (number) — count of successfully fetched users
+- `userErrors` (Record<string, string>) — per-username error messages (omitted if none)
+- `users` on each match (string[]) — which usernames have this film on their watchlist
+
 ### Files involved at each step
 
 | Step | Files |
@@ -355,6 +399,7 @@ No other configuration is needed. The `next.config.ts` is empty — there are no
 - **ICS export:** Download individual or all screenings as calendar events
 - **Venue filtering:** Filter results by cinema
 - **Rate limiting:** 10 requests per minute per IP
+- **Watch together:** Enter 2-5 Letterboxd usernames to find films on all/some watchlists that are currently screening, with shared/partial split and per-user colour indicators
 
 ### Scrapers
 

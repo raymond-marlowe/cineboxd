@@ -26,4 +26,5 @@ export interface MatchedScreening {
   film: WatchlistFilm;
   screenings: Screening[];
   metadata?: FilmMetadata;
+  users?: string[];
 }
