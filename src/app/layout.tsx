@@ -26,9 +26,23 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
       >
         {children}
+        <footer className="border-t border-border mt-auto">
+          <div className="max-w-4xl mx-auto px-4 py-6 text-center text-sm text-muted">
+            <p>
+              Made by Alexander Nikolov{" "}
+              <span className="mx-1">&middot;</span>{" "}
+              <a href="/about" className="text-accent hover:underline">
+                About
+              </a>{" "}
+              <span className="mx-1">&middot;</span>{" "}
+              Screening data may be inaccurate — always check the venue before
+              booking
+            </p>
+          </div>
+        </footer>
       </body>
     </html>
   );

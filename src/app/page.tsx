@@ -121,7 +121,7 @@ export default function Home() {
   }, [filteredMatches]);
 
   return (
-    <div className="min-h-screen">
+    <div className="flex-1">
       <header className="border-b border-border">
         <div className="max-w-4xl mx-auto px-4 py-6 flex items-center justify-between">
           <button onClick={reset} className="cursor-pointer">
