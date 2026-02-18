@@ -337,12 +337,14 @@ function HomeInner() {
   const filteredPartial = partialMatches ? applyVenueFilter(partialMatches) : undefined;
 
   // Flattened screenings for the calendar view
+  // In together mode use filteredShared (intersection only) to match the list view
   const flatScreenings = useMemo(() => {
-    if (!filteredMatches) return [];
-    return filteredMatches.flatMap((m) =>
+    const source = isTogether ? filteredShared : filteredMatches;
+    if (!source) return [];
+    return source.flatMap((m) =>
       m.screenings.map((s) => ({ film: m.film, screening: s }))
     );
-  }, [filteredMatches]);
+  }, [isTogether, filteredShared, filteredMatches]);
 
   const handleDownloadSingleIcs = useCallback(
     (screening: Screening, filmTitle: string) => {
