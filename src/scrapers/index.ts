@@ -4,6 +4,9 @@ import { scrapeCloseUp } from "./close-up";
 import { scrapeICA } from "./ica";
 import { scrapeBarbican } from "./barbican";
 import { scrapeRio } from "./rio";
+import { scrapeGenesis } from "./genesis";
+import { scrapeArthousCrouchEnd } from "./arthouse-crouch-end";
+import { scrapeActOne } from "./act-one";
 
 // TODO: Picturehouse scraper disabled — API data did not reliably match website listings.
 // See picturehouse.ts for details on re-enabling.
@@ -20,6 +23,9 @@ export const scrapers: Scraper[] = [
   scrapeICA,
   scrapeBarbican,
   scrapeRio,
+  scrapeGenesis,
+  scrapeArthousCrouchEnd,
+  scrapeActOne,
 ];
 
 export async function scrapeAll(): Promise<Screening[]> {

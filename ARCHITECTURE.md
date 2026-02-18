@@ -91,10 +91,13 @@ Content-Type: application/json
         │
         ▼
         ├──────── Scrape cinemas (scrapers/index.ts) ──── GET princecharlescinema.com/...
-        │         All 5 scrapers run in parallel           GET closeupfilmcentre.com/...
+        │         All 8 scrapers run in parallel           GET closeupfilmcentre.com/...
         │         Failed scrapers are silently skipped     GET ica.art/...
         │         Results cached for 6 hours               GET barbican.org.uk/...
         │         → Screening[]                            GET riocinema.org.uk/...
+        │                                                  GET genesiscinema.co.uk/...
+        │                                                  GET arthousecrouchend.co.uk/...
+        │                                                  GET actonecinema.co.uk/...
         │
         ▼
         ├──────── Match films (matcher.ts)
@@ -198,7 +201,7 @@ JSON response ──────────────────────
 | API entry point + rate limiting | `api/match/route.ts`, `rate-limit.ts` |
 | Watchlist from username | `letterboxd-rss.ts` |
 | Watchlist from CSV | `csv-parser.ts` |
-| Cinema scraping | `scrapers/index.ts`, `prince-charles.ts`, `close-up.ts`, `ica.ts`, `barbican.ts`, `rio.ts` |
+| Cinema scraping | `scrapers/index.ts`, `prince-charles.ts`, `close-up.ts`, `ica.ts`, `barbican.ts`, `rio.ts`, `genesis.ts`, `arthouse-crouch-end.ts`, `act-one.ts` |
 | Scraper caching | `cache.ts` |
 | Film matching | `matcher.ts`, `csv-parser.ts` (for `normalizeTitle`) |
 | TMDB enrichment | `tmdb.ts`, `cache.ts` |
@@ -281,6 +284,57 @@ JSON response ──────────────────────
 - **Sold out handling:** Sets `bookingUrl` to `null` when `IsSoldOut === "Y"`
 - **Limitations:** Depends on the `var Events =` pattern existing in the HTML. If Rio changes their frontend framework, this breaks entirely.
 - **Reliability:** High — structured data is more reliable than CSS selectors, but the extraction method is fragile.
+
+### Genesis Cinema — ENABLED
+
+- **URL:** `https://genesiscinema.co.uk/GenesisCinema.dll/WhatsOn`
+- **Platform:** Admit-One cinema management system
+- **Method:** HTML scraping with Cheerio
+- **Selectors:**
+  - `div.whatson_panel[id^="panel_"]` — one per date; id encodes date as `panel_YYYYMMDD`
+  - `div.grid-container-border` — one card per film within each panel
+  - `h2.text-black > a` — film title and detail link (relative, e.g. `event/106837`)
+  - `.perfButton` — booking buttons; text is the time (24h, e.g. "20:45"); `href` is the absolute Admit-One booking URL
+- **Date parsing:** Extracted directly from panel id: `panel_20260218` → `2026-02-18`
+- **Deduplication:** Each showing is listed twice in the HTML (desktop and mobile responsive copies); deduplicated by booking URL using a `Set`
+- **Returns:** Title, year (from trailing `(YYYY)` in title), date, time, venue, booking URL, format (null)
+- **Limitations:** Format tags (Subtitled, Audio Described, etc.) are present as `<img alt="...">` elements but not yet extracted.
+- **Reliability:** High — panel IDs are stable structural identifiers.
+
+### Arthouse Crouch End — ENABLED
+
+- **URL:** `https://www.arthousecrouchend.co.uk/` (homepage)
+- **Platform:** Savoy Systems; site built with Elementor/WordPress
+- **Method:** HTML scraping with Cheerio
+- **Selectors:**
+  - `div.tabs > label` — date tab labels (e.g. "Today", "Thu 19 Feb")
+  - `div.tab` — tab content panels; each immediately follows its label in the DOM
+  - `.programmeinfo` — one per film per tab
+  - `.show-title > a` — film title link; contains a `<span class="prog-cert">` with BBFC rating image that is stripped via `.clone().children().remove().end().text()`
+  - `.OpenForSale > a` — available booking links; text begins with 24h time (e.g. "20:30...")
+  - `.SoldOut > a` — sold-out booking links (included in results)
+- **Booking URLs:** Absolute `http://arthousecrouchend.savoysystems.co.uk/ArthouseCrouchEnd.dll/...` URLs with unique `TcsPerformance_XXXXXXX` identifiers
+- **Date parsing:** "Today" → current date; "Thu 19 Feb" → parsed day + month + inferred year
+- **Returns:** Title, year (if present in title), date, time, venue, booking URL, format (null)
+- **Reliability:** Medium — CSS class names are meaningful but could change in a WordPress theme update.
+
+### ActOne Cinema — ENABLED (today only)
+
+- **URL:** `https://www.actonecinema.co.uk/whats-on/`
+- **Platform:** Indy Systems (Quasar/Vue SPA)
+- **Method:** HTML scraping of pre-rendered SEO content with Cheerio
+- **Note:** ActOne is a Vue SPA; film data is loaded via XHR after JS execution. However, the server pre-renders today's schedule in a visually-hidden `<div>` (z-index: -1000) inside `#q-app` for accessibility/SEO.
+- **Selectors:**
+  - `#q-app > div:first-child` — the hidden pre-rendered div
+  - `p` elements containing `a[href*="/movie/"]` anchors — today's schedule as formatted text
+  - `a[href*="/movie/"]` — film title links
+  - `a[href*="/checkout/showing/"]` — booking links; text is the time in 12-hour format (e.g. "12:30PM")
+- **Date:** Always today's date (full weekly schedule not available without JS execution)
+- **Time parsing:** Converts 12-hour AM/PM to 24-hour format
+- **Booking URLs:** Absolute `https://www.actonecinema.co.uk/checkout/showing/{slug}/{id}` URLs
+- **Returns:** Title, date (today), time, venue, booking URL, year (null — not in title text), format (null)
+- **Limitations:** Only today's screenings are available; the pre-rendered div structure may change if Indy Systems updates their platform.
+- **Reliability:** Medium — depends on the hidden pre-rendered content remaining in the HTML.
 
 ### Picturehouse Cinemas — DISABLED
 

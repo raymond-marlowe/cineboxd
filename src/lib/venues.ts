@@ -9,10 +9,13 @@ export interface VenueCoords {
  */
 export const VENUE_COORDS: Record<string, VenueCoords> = {
   "Prince Charles Cinema": { lat: 51.5122, lng: -0.1291 }, // 7 Leicester Place, WC2H 7BY
-  "Close-Up Film Centre": { lat: 51.5252, lng: -0.0741 },  // 97 Sclater Street, E1 6HR
-  "ICA Cinema":           { lat: 51.5059, lng: -0.1318 },  // The Mall, SW1Y 5AH
-  "Barbican Cinema":      { lat: 51.5204, lng: -0.0962 },  // Barbican Centre, EC2Y 8DS
-  "Rio Cinema":           { lat: 51.5452, lng: -0.0749 },  // 107 Kingsland High St, E8 2PB
+  "Close-Up Film Centre":  { lat: 51.5252, lng: -0.0741 }, // 97 Sclater Street, E1 6HR
+  "ICA Cinema":            { lat: 51.5059, lng: -0.1318 }, // The Mall, SW1Y 5AH
+  "Barbican Cinema":       { lat: 51.5204, lng: -0.0962 }, // Barbican Centre, EC2Y 8DS
+  "Rio Cinema":            { lat: 51.5452, lng: -0.0749 }, // 107 Kingsland High St, E8 2PB
+  "Genesis Cinema":        { lat: 51.5200, lng: -0.0484 }, // 93-95 Mile End Road, E1 4UJ
+  "Arthouse Crouch End":   { lat: 51.5767, lng: -0.1197 }, // 159A Tottenham Lane, N8 9BT
+  "ActOne Cinema":         { lat: 51.5082, lng: -0.2679 }, // 119-121 High Street, Acton, W3 6NA
 };
 
 /** Haversine distance between two lat/lng points, in miles. */
