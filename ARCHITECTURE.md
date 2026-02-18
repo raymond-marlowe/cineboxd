@@ -91,7 +91,7 @@ Content-Type: application/json
         │
         ▼
         ├──────── Scrape cinemas (scrapers/index.ts) ──── GET princecharlescinema.com/...
-        │         All 11 scrapers run in parallel          GET closeupfilmcentre.com/...
+        │         All 14 scrapers run in parallel          GET closeupfilmcentre.com/...
         │         Failed scrapers are silently skipped     GET ica.art/...
         │         Results cached for 6 hours               GET barbican.org.uk/...
         │         → Screening[]                            GET riocinema.org.uk/...
@@ -401,6 +401,49 @@ JSON response ──────────────────────
 - **Headers:** `Content-Type: application/x-www-form-urlencoded`, `X-Requested-With: XMLHttpRequest`
 - **Status:** Disabled because API data did not match actual website listings, and booking URLs were invalid.
 - **To re-enable:** Verify API matches website, fix booking URL format, add back to `scrapers/index.ts`.
+
+### Regent Street Cinema — ENABLED
+
+- **URL:** `https://www.regentstreetcinema.com/sitemap.xml` (slug discovery) + `https://api-uk.indy.systems/graphql` (data)
+- **Platform:** Indy Systems SPA (same as ActOne Cinema). No server-rendered HTML — data comes from a public GraphQL API.
+- **Method:** Three-stage GraphQL approach with chunked concurrency (20 slugs / 10 showings per batch):
+  1. Fetch `sitemap.xml` → extract `/movie/{slug}/` URLs (typically ~114 slugs, mostly historical archive)
+  2. `findMovieBySlug(urlSlug, siteIds:[85])` → resolve slug to `{ id, name }`
+  3. `movie(id) { showings { id, time, published, showingBadges } }` → filter `published=true` AND `time > now` (UTC)
+- **Date/time:** Showings are returned as UTC ISO timestamps; converted to London local time via `Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London" })`.
+- **Format:** `showingBadges[].displayName` joined — e.g. "Reserved Seating, 130th Anniversary Celebrations"
+- **Booking URL:** `https://www.regentstreetcinema.com/checkout/showing/{showingId}`
+- **Returns:** Title (year stripped from parenthetical if present), year, date, time, venue, booking URL, format
+- **Reliability:** Medium-high — GraphQL API is stable but requires two round-trips per film and the sitemap includes many archived films.
+
+### Rich Mix — ENABLED
+
+- **URL (listing):** `https://richmix.org.uk/whats-on/cinema/`
+- **URL (per film):** `https://richmix.org.uk/cinema/{slug}/`
+- **Platform:** WordPress with Spektrix ticketing (booking IDs are Spektrix instance IDs)
+- **Method:** Two-pass HTML scraping with Cheerio:
+  - Pass 1 (listing): `div.tease.tease-cinema` → `header h3 a` for title + film page URL
+  - Pass 2 (per film, parallel): `div#dates-and-times div.day` → `div.weekday` (date text) + `div.times a.time` (time + booking href)
+- **Date parsing:** Human-readable text — "today" / "tomorrow" resolved relative to current date; "Fri 20 Feb" parsed with month-rollover logic.
+- **Time parsing:** Dot-separated 12h format, e.g. "5.40pm" → "17:40".
+- **Format:** `null` (no per-screening format tags on Rich Mix pages)
+- **Booking URL:** `https://richmix.org.uk` + `a.time[href]`, e.g. `https://richmix.org.uk/book-online/1818209`
+- **Returns:** Title, year (if parenthetical in listing), date, time, venue, booking URL, format
+- **Reliability:** High — standard HTML, no JavaScript required; static HTML includes both visible and collapsed date sections.
+
+### JW3 — ENABLED
+
+- **URL:** `https://system.spektrix.com/jw3/api/v3/events` (event list) + `.../events/{id}/instances` (per-event showtime list)
+- **Platform:** Drupal CMS frontend; ticketing via Spektrix REST API (public, no auth required)
+- **Method:** Two-call Spektrix API approach (no HTML scraping needed):
+  1. `GET /events` → filter `attribute_Genre === "Cinema"` (typically ~32 of ~253 total events)
+  2. `GET /events/{id}/instances` → per-screening slots; filter `cancelled !== true` and `dateStr >= today`
+- **Series handling:** If `attribute_SeriesOrFestival` is set (e.g. "Babykino"), the prefix is stripped from the event name to give the underlying film title (e.g. "Babykino: Marty Supreme" → title "Marty Supreme", format "Babykino").
+- **Date/time:** `instance.start` is a local London ISO datetime (no timezone suffix), e.g. `"2026-02-16T16:10:00"`.
+- **Format:** Series name + `attribute_SLCaptioned` (signed language captioning) + non-English `attribute_Language` joined with ", "
+- **Booking URL:** `https://www.jw3.org.uk/whats-on/{slugified-event-name}` (best-effort; constructed by lowercasing + hyphenating the event name)
+- **Returns:** Title, year, date, time, venue, booking URL, format
+- **Reliability:** High — structured JSON API is stable; slug-based booking URLs are best-effort but accurate for most events.
 
 ### Everyman Cinema — NOT IMPLEMENTED
 

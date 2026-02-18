@@ -19,6 +19,9 @@ export const VENUE_COORDS: Record<string, VenueCoords> = {
   "Phoenix Cinema":        { lat: 51.5884, lng: -0.1664 }, // 52 High Road, East Finchley, N2 9PJ
   "The Lexi Cinema":       { lat: 51.5354, lng: -0.2207 }, // 194B Chamberlayne Rd, Kensal Rise, NW10 3JU
   "Garden Cinema":         { lat: 51.5139, lng: -0.1227 }, // 7-12 Shorts Gardens, Covent Garden, WC2H 9AT
+  "Regent Street Cinema":  { lat: 51.5081, lng: -0.1349 }, // 49 Regent Street, W1B 4JY
+  "Rich Mix":              { lat: 51.5224, lng: -0.0747 }, // 35-47 Bethnal Green Road, E1 6LA
+  "JW3":                   { lat: 51.5554, lng: -0.1788 }, // 341-351 Finchley Road, NW3 6ET
 };
 
 /** Haversine distance between two lat/lng points, in miles. */

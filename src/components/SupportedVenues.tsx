@@ -24,6 +24,9 @@ export const SUPPORTED_VENUES: Venue[] = [
   { name: "Phoenix Cinema",         url: "https://phoenixcinema.co.uk" },
   { name: "The Lexi Cinema",        url: "https://thelexicinema.co.uk" },
   { name: "Garden Cinema",          url: "https://thegardencinema.co.uk" },
+  { name: "Regent Street Cinema",   url: "https://www.regentstreetcinema.com" },
+  { name: "Rich Mix",               url: "https://richmix.org.uk/whats-on/cinema/" },
+  { name: "JW3",                    url: "https://www.jw3.org.uk/cinema" },
 ];
 
 const CLAMP = 10;

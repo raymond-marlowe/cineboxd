@@ -10,6 +10,9 @@ import { scrapeActOne } from "./act-one";
 import { scrapePhoenix } from "./phoenix";
 import { scrapeLexi } from "./lexi";
 import { scrapeGarden } from "./garden";
+import { scrapeRegentStreet } from "./regent-street";
+import { scrapeRichMix } from "./rich-mix";
+import { scrapeJW3 } from "./jw3";
 
 // TODO: Picturehouse scraper disabled — API data did not reliably match website listings.
 // See picturehouse.ts for details on re-enabling.
@@ -32,6 +35,9 @@ export const scrapers: Scraper[] = [
   scrapePhoenix,
   scrapeLexi,
   scrapeGarden,
+  scrapeRegentStreet,
+  scrapeRichMix,
+  scrapeJW3,
 ];
 
 export async function scrapeAll(): Promise<Screening[]> {
