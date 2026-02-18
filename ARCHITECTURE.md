@@ -91,13 +91,16 @@ Content-Type: application/json
         │
         ▼
         ├──────── Scrape cinemas (scrapers/index.ts) ──── GET princecharlescinema.com/...
-        │         All 8 scrapers run in parallel           GET closeupfilmcentre.com/...
+        │         All 11 scrapers run in parallel          GET closeupfilmcentre.com/...
         │         Failed scrapers are silently skipped     GET ica.art/...
         │         Results cached for 6 hours               GET barbican.org.uk/...
         │         → Screening[]                            GET riocinema.org.uk/...
         │                                                  GET genesiscinema.co.uk/...
         │                                                  GET arthousecrouchend.co.uk/...
         │                                                  GET actonecinema.co.uk/...
+        │                                                  GET phoenixcinema.co.uk/ (+ N film pages)
+        │                                                  GET thelexicinema.co.uk/...
+        │                                                  GET thegardencinema.co.uk/...
         │
         ▼
         ├──────── Match films (matcher.ts)
@@ -201,7 +204,7 @@ JSON response ──────────────────────
 | API entry point + rate limiting | `api/match/route.ts`, `rate-limit.ts` |
 | Watchlist from username | `letterboxd-rss.ts` |
 | Watchlist from CSV | `csv-parser.ts` |
-| Cinema scraping | `scrapers/index.ts`, `prince-charles.ts`, `close-up.ts`, `ica.ts`, `barbican.ts`, `rio.ts`, `genesis.ts`, `arthouse-crouch-end.ts`, `act-one.ts` |
+| Cinema scraping | `scrapers/index.ts`, `prince-charles.ts`, `close-up.ts`, `ica.ts`, `barbican.ts`, `rio.ts`, `genesis.ts`, `arthouse-crouch-end.ts`, `act-one.ts`, `phoenix.ts`, `lexi.ts`, `garden.ts` |
 | Scraper caching | `cache.ts` |
 | Film matching | `matcher.ts`, `csv-parser.ts` (for `normalizeTitle`) |
 | TMDB enrichment | `tmdb.ts`, `cache.ts` |
@@ -335,6 +338,61 @@ JSON response ──────────────────────
 - **Returns:** Title, date (today), time, venue, booking URL, year (null — not in title text), format (null)
 - **Limitations:** Only today's screenings are available; the pre-rendered div structure may change if Indy Systems updates their platform.
 - **Reliability:** Medium — depends on the hidden pre-rendered content remaining in the HTML.
+
+### Phoenix Cinema — ENABLED
+
+- **CMS page:** `https://phoenixcinema.co.uk/whats-on/`
+- **DLL base:** `https://www.phoenixcinema.co.uk/PhoenixCinemaLondon.dll/`
+- **Platform:** Savoy Systems (same DLL backend as Arthouse Crouch End)
+- **Method:** Two-stage HTML scraping with Cheerio
+  1. Fetch the CMS page and collect all unique film IDs from `a[href*="?f="]` links
+  2. Fetch each film detail page (`DLL/WhatsOn?f=<id>`) in parallel via `Promise.allSettled`
+- **Selectors on each film detail page:**
+  - `title` tag → film name (strip "Phoenix Cinema | " prefix)
+  - `ul.performances > li.performance` — one per screening slot
+  - `span.date.column` — date text ("Thu 19 Feb")
+  - `span.perf-time` — time in 24-hour format ("19:40")
+  - `a.button.booking[href]` — relative booking URL (prepend DLL base)
+  - `span.tag` inside `li.performance` — format tags ("CC", "AD", "B", "R"); "SO" = sold out
+- **Date parsing:** "Thu 19 Feb" → parsed day + 3-letter month + inferred year (same helper as Arthouse)
+- **Deduplication:** Pages render performances twice (desktop/mobile); deduplicated by booking URL using a `Set`
+- **Returns:** Title, year (from trailing `(YYYY)` in title), date, time, venue, booking URL, format
+- **Reliability:** Medium — depends on CMS page structure for film IDs + DLL film page structure for times.
+
+### The Lexi Cinema — ENABLED
+
+- **URL:** `https://thelexicinema.co.uk/TheLexiCinema.dll/WhatsOn`
+- **Platform:** Savoy Systems (same JSON-in-HTML pattern as Rio Cinema)
+- **Method:** Embedded JSON extraction (not HTML scraping)
+- **Data source:** The page embeds all events as a JavaScript variable:
+  ```
+  var Events =
+  {"Events":[...]}
+  ```
+- **JSON structure:**
+  ```
+  { Events: [{ Title, Year, Tags: [{ Format }], Performances: [{ StartDate, StartTimeAndNotes, IsSoldOut, URL, AD, HOH, SL, QA, FF }] }] }
+  ```
+- **Booking URL:** `StartDate` is "YYYY-MM-DD", `StartTimeAndNotes` is "HH:MM" (24h). `URL` is a relative path; prepend `https://thelexicinema.co.uk/TheLexiCinema.dll/`
+- **Format:** Derived from per-performance boolean flags — `AD` (Audio Described), `HOH` (Subtitled), `SL` (Signed), `QA` (Q&A) — combined with `Tags[0].Format`
+- **Returns:** Title, year (from `Year` field), date, time, venue, booking URL (null if sold out), format
+- **Reliability:** High — structured JSON data is more stable than CSS selectors.
+
+### Garden Cinema — ENABLED
+
+- **URL:** `https://thegardencinema.co.uk/` (homepage is the full what's-on schedule)
+- **Platform:** WordPress with custom Savoy Systems integration (bookings at `bookings.thegardencinema.co.uk`)
+- **Method:** HTML scraping with Cheerio
+- **Selectors:**
+  - `.date-block[data-date]` — one per date; `data-date` is "YYYY-MM-DD" (no parsing needed)
+  - `.films-list__by-date__film` — one per film within a date block
+  - `h1.films-list__by-date__film__title` — film title, with child `<span>` (BBFC rating) stripped
+  - `.screening-panel` — one per individual screening slot
+  - `span.screening-time > a.screening` — booking link; text is the time ("13:00"), href is the absolute booking URL
+  - `[class*="screening-tag"]` — format/attribute tags; class includes "ext-audio_description", "ext-intro", "ext-q_and_a" etc.
+- **Booking URLs:** Absolute `https://bookings.thegardencinema.co.uk/TheGardenCinema.dll/...` URLs
+- **Returns:** Title, year (from trailing `(YYYY)` in title), date, time, venue, booking URL, format
+- **Reliability:** High — semantic CSS classes and data attributes are stable.
 
 ### Picturehouse Cinemas — DISABLED
 

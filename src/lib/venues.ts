@@ -16,6 +16,9 @@ export const VENUE_COORDS: Record<string, VenueCoords> = {
   "Genesis Cinema":        { lat: 51.5200, lng: -0.0484 }, // 93-95 Mile End Road, E1 4UJ
   "Arthouse Crouch End":   { lat: 51.5767, lng: -0.1197 }, // 159A Tottenham Lane, N8 9BT
   "ActOne Cinema":         { lat: 51.5082, lng: -0.2679 }, // 119-121 High Street, Acton, W3 6NA
+  "Phoenix Cinema":        { lat: 51.5884, lng: -0.1664 }, // 52 High Road, East Finchley, N2 9PJ
+  "The Lexi Cinema":       { lat: 51.5354, lng: -0.2207 }, // 194B Chamberlayne Rd, Kensal Rise, NW10 3JU
+  "Garden Cinema":         { lat: 51.5139, lng: -0.1227 }, // 7-12 Shorts Gardens, Covent Garden, WC2H 9AT
 };
 
 /** Haversine distance between two lat/lng points, in miles. */

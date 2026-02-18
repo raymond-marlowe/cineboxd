@@ -974,7 +974,10 @@ function HomeInner() {
                 <a href="https://riocinema.org.uk" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Rio Cinema</a>,{" "}
                 <a href="https://genesiscinema.co.uk" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Genesis</a>,{" "}
                 <a href="https://www.arthousecrouchend.co.uk" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Arthouse Crouch End</a>,{" "}
-                <a href="https://www.actonecinema.co.uk" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">ActOne</a>
+                <a href="https://www.actonecinema.co.uk" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">ActOne</a>,{" "}
+                <a href="https://phoenixcinema.co.uk" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Phoenix</a>,{" "}
+                <a href="https://thelexicinema.co.uk" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Lexi</a>,{" "}
+                <a href="https://thegardencinema.co.uk" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Garden Cinema</a>
               </p>
             </div>
           </div>
