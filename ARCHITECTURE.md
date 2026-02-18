@@ -453,3 +453,92 @@ No other configuration is needed. The `next.config.ts` is empty — there are no
 - **Rate limiting:** Also in-memory and per-instance — not globally enforced across Vercel's distributed infrastructure.
 - **No year data from some scrapers:** Close-Up and ICA don't provide release years, which can cause incorrect matches for remakes or films with similar titles.
 - **Fixed 2-hour ICS duration:** All calendar events assume a 2-hour runtime regardless of actual film length.
+
+---
+
+## Weekly Email Subscription Feature
+
+### Overview
+
+Users can subscribe to receive a weekly email digest listing which films from their Letterboxd watchlist are showing in London that week. Emails are sent via [Resend](https://resend.com).
+
+### New API Routes
+
+| Route | Method | Auth | Description |
+|---|---|---|---|
+| `/api/subscribe` | POST | None | Subscribe `{ email, username }` → `{ success, id }` |
+| `/api/subscribe` | DELETE | None | Remove by `{ id }` → `{ success }` |
+| `/api/unsubscribe` | GET | None | `?id=<id>` — one-click unsubscribe from email link; renders HTML confirmation |
+| `/api/notify` | POST | Bearer token | Fetch all subscribers, match watchlists, send emails; returns `{ sent, skipped, errors }` |
+
+### New Source Files
+
+| File | Purpose |
+|---|---|
+| `src/lib/subscriptions.ts` | Read/write subscriptions to a local JSON file |
+| `src/app/api/subscribe/route.ts` | Subscribe / unsubscribe by ID |
+| `src/app/api/unsubscribe/route.ts` | One-click HTML unsubscribe page |
+| `src/app/api/notify/route.ts` | Trigger email send to all subscribers |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `RESEND_API_KEY` | Yes (for `/api/notify`) | API key from resend.com |
+| `RESEND_FROM_EMAIL` | No | From address (e.g. `cineboxd <hello@yourdomain.com>`). Defaults to `onboarding@resend.dev` (Resend test sender — only delivers to verified addresses). |
+| `NOTIFY_SECRET` | Yes (for `/api/notify`) | Bearer token required to call the notify route. Set via `Authorization: Bearer <secret>`. |
+| `NEXT_PUBLIC_BASE_URL` | No | Production base URL for unsubscribe links. Defaults to `https://cineboxd.vercel.app`. |
+
+### Data Storage
+
+Subscriptions are stored as a JSON array in a flat file:
+
+- **Local dev:** `<project-root>/data/subscriptions.json`
+- **Vercel production:** `/tmp/subscriptions.json`
+
+Detection: `process.env.VERCEL ? '/tmp' : path.join(process.cwd(), 'data')`
+
+`data/subscriptions.json` is listed in `.gitignore` and should not be committed.
+
+> **Important:** On Vercel, the filesystem outside `/tmp` is read-only, and `/tmp` is ephemeral — it is cleared between cold starts and deployments. This means **subscriptions do not persist across Vercel deployments or cold starts**. For a production-ready solution, migrate the JSON file store to a persistent database (e.g. Vercel Postgres, PlanetScale, Turso, Upstash Redis).
+
+### Notify Data Flow
+
+```
+POST /api/notify (Authorization: Bearer <NOTIFY_SECRET>)
+  │
+  ├─ readSubscriptions()          → load all subscribers from JSON file
+  ├─ scrapeAll()                  → fetch current London cinema listings
+  │
+  └─ for each subscriber (parallel):
+       ├─ fetchWatchlistByUsername(username)
+       ├─ matchFilms(watchlist, screenings)
+       ├─ fetchFilmMetadata() per match  (TMDB enrichment, if key set)
+       ├─ filter to screenings within next 7 days
+       ├─ if no matches → skip (no email sent)
+       └─ resend.emails.send(...)  → deliver HTML digest
+  │
+  └─ return { sent, skipped, errors }
+```
+
+### Triggering Notifications
+
+The `/api/notify` route is designed to be called by an external cron job (e.g. Vercel Cron, GitHub Actions, cron-job.org) once per week:
+
+```bash
+curl -X POST https://cineboxd.vercel.app/api/notify \
+  -H "Authorization: Bearer <NOTIFY_SECRET>"
+```
+
+Example Vercel cron configuration (`vercel.json`):
+```json
+{
+  "crons": [
+    {
+      "path": "/api/notify",
+      "schedule": "0 9 * * 1"
+    }
+  ]
+}
+```
+Note: Vercel Cron does not support custom headers, so for production use a third-party cron service that supports bearer auth headers, or an intermediate serverless function.

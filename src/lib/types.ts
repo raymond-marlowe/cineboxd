@@ -28,3 +28,10 @@ export interface MatchedScreening {
   metadata?: FilmMetadata;
   users?: string[];
 }
+
+export interface Subscription {
+  id: string;       // random 8-char hex, used in unsubscribe links
+  email: string;
+  username: string; // Letterboxd username
+  createdAt: number; // Date.now() timestamp
+}

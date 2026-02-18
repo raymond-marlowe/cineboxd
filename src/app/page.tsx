@@ -37,6 +37,11 @@ function HomeInner() {
 
   const [copied, setCopied] = useState(false);
 
+  // Weekly alerts state
+  const [alertEmail, setAlertEmail] = useState("");
+  const [alertState, setAlertState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [alertError, setAlertError] = useState<string | null>(null);
+
   // Watch together state
   const [mode, setMode] = useState<InputMode>("solo");
   const [groupUsernames, setGroupUsernames] = useState<string[]>(["", ""]);
@@ -254,6 +259,9 @@ function HomeInner() {
     setMode("solo");
     setGroupUsernames(["", ""]);
     setPartialExpanded(false);
+    setAlertEmail("");
+    setAlertState("idle");
+    setAlertError(null);
     router.replace("/");
   };
 
@@ -332,6 +340,8 @@ function HomeInner() {
     [venueFilter]
   );
 
+  const isTogether = data?.totalUsers != null;
+
   const filteredMatches = data ? applyVenueFilter(data.matches) : undefined;
   const filteredShared = sharedMatches ? applyVenueFilter(sharedMatches) : undefined;
   const filteredPartial = partialMatches ? applyVenueFilter(partialMatches) : undefined;
@@ -372,7 +382,30 @@ function HomeInner() {
     setTimeout(() => setCopied(false), 2000);
   }, []);
 
-  const isTogether = data?.totalUsers != null;
+  const handleSubscribe = useCallback(
+    async (email: string) => {
+      setAlertState("loading");
+      setAlertError(null);
+      try {
+        const res = await fetch("/api/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, username }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          setAlertState("error");
+          setAlertError(json.error || "Something went wrong");
+        } else {
+          setAlertState("success");
+        }
+      } catch {
+        setAlertState("error");
+        setAlertError("Failed to connect to server");
+      }
+    },
+    [username]
+  );
 
   const renderUserDots = (users?: string[]) => {
     if (!users || !isTogether) return null;
@@ -574,7 +607,7 @@ function HomeInner() {
               </h2>
               <p className="text-muted max-w-md mx-auto">
                 {mode === "solo"
-                  ? "Enter your Letterboxd username to see which films on your watchlist are currently screening at London\u2019s repertory cinemas."
+                  ? <>Enter your Letterboxd username to see which films on your watchlist are currently screening at London&rsquo;s <a href="https://en.wikipedia.org/wiki/Revival_house" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">repertory cinemas</a>.</>
                   : "Enter Letterboxd usernames to find films you all want to watch that are currently screening."}
               </p>
             </div>
@@ -721,7 +754,12 @@ function HomeInner() {
 
             <div className="text-sm text-muted space-y-1 text-center">
               <p>
-                Currently checking: Prince Charles, Close-Up, ICA, Barbican, Rio
+                Currently checking:{" "}
+                <a href="https://princecharlescinema.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Prince Charles</a>,{" "}
+                <a href="https://closeupfilmcentre.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Close-Up</a>,{" "}
+                <a href="https://www.ica.art/cinema" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">ICA</a>,{" "}
+                <a href="https://www.barbican.org.uk/whats-on/cinema" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Barbican</a>,{" "}
+                <a href="https://riocinema.org.uk" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Rio Cinema</a>
               </p>
             </div>
           </div>
@@ -998,6 +1036,60 @@ function HomeInner() {
                     </button>
                   </div>
                 </div>
+
+                {/* CSV upload nudge */}
+                {!username && (
+                  <p className="text-sm text-muted">
+                    Want weekly alerts?{" "}
+                    <button
+                      onClick={reset}
+                      className="underline hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      Search by Letterboxd username instead.
+                    </button>
+                  </p>
+                )}
+
+                {/* Weekly alerts — compact strip between controls and results */}
+                {username && (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-border bg-card px-4 py-3">
+                    {alertState === "success" ? (
+                      <p className="text-sm text-green-400">
+                        Subscribed! You&apos;ll get a weekly email when your watchlist is screening.
+                      </p>
+                    ) : (
+                      <>
+                        <span className="text-sm text-muted shrink-0">Get weekly alerts</span>
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            handleSubscribe(alertEmail);
+                          }}
+                          className="flex flex-1 gap-2"
+                        >
+                          <input
+                            type="email"
+                            value={alertEmail}
+                            onChange={(e) => setAlertEmail(e.target.value)}
+                            placeholder="your@email.com"
+                            required
+                            className="flex-1 min-w-0 bg-background border border-border rounded-lg px-3 py-1.5 text-foreground placeholder:text-muted focus:outline-none focus:border-accent transition-colors text-sm"
+                          />
+                          <button
+                            type="submit"
+                            disabled={alertState === "loading"}
+                            className="bg-accent text-background font-medium px-3 py-1.5 rounded-lg hover:bg-accent/90 transition-colors cursor-pointer text-sm shrink-0 disabled:opacity-50"
+                          >
+                            {alertState === "loading" ? "..." : "Subscribe"}
+                          </button>
+                        </form>
+                        {alertError && (
+                          <p className="text-red-400 text-sm shrink-0">{alertError}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {viewMode === "calendar" ? (
                   <Calendar
