@@ -5,6 +5,12 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { MatchedScreening, Screening } from "@/lib/types";
 import { generateIcsEvent, generateIcsFile, downloadIcs } from "@/lib/ics";
 import Calendar from "@/components/calendar";
+import {
+  VENUE_COORDS,
+  distanceMiles,
+  formatDistance,
+  nearestVenueDistance,
+} from "@/lib/venues";
 
 interface MatchResponse {
   watchlistCount: number;
@@ -41,6 +47,14 @@ function HomeInner() {
   const [alertEmail, setAlertEmail] = useState("");
   const [alertState, setAlertState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [alertError, setAlertError] = useState<string | null>(null);
+
+  // Location / distance state
+  const [postcode, setPostcode] = useState("");
+  const [postcodeCoords, setPostcodeCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [postcodeLoading, setPostcodeLoading] = useState(false);
+  const [postcodeError, setPostcodeError] = useState<string | null>(null);
+  const [sortByDistance, setSortByDistance] = useState(false);
+  const [maxDistanceMiles, setMaxDistanceMiles] = useState<number | null>(null);
 
   // Watch together state
   const [mode, setMode] = useState<InputMode>("solo");
@@ -196,6 +210,16 @@ function HomeInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Restore saved postcode from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("cineboxd_postcode");
+    if (saved) {
+      setPostcode(saved);
+      geocodePostcode(saved);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleFile = useCallback(async (file: File) => {
     if (!file.name.endsWith(".csv")) {
       setError("Please upload a CSV file");
@@ -342,9 +366,82 @@ function HomeInner() {
 
   const isTogether = data?.totalUsers != null;
 
-  const filteredMatches = data ? applyVenueFilter(data.matches) : undefined;
-  const filteredShared = sharedMatches ? applyVenueFilter(sharedMatches) : undefined;
-  const filteredPartial = partialMatches ? applyVenueFilter(partialMatches) : undefined;
+  const filteredMatches = (() => {
+    if (!data) return undefined;
+    let result = applyVenueFilter(data.matches);
+    if (postcodeCoords && maxDistanceMiles !== null) {
+      const maxMi = maxDistanceMiles;
+      result = result
+        .map((m) => ({
+          ...m,
+          screenings: m.screenings.filter((s) => {
+            const vc = VENUE_COORDS[s.venue];
+            if (!vc) return true;
+            return distanceMiles(postcodeCoords.lat, postcodeCoords.lng, vc.lat, vc.lng) <= maxMi;
+          }),
+        }))
+        .filter((m) => m.screenings.length > 0);
+    }
+    if (postcodeCoords && sortByDistance) {
+      result = [...result].sort((a, b) => {
+        const dA = nearestVenueDistance(a.screenings, postcodeCoords.lat, postcodeCoords.lng);
+        const dB = nearestVenueDistance(b.screenings, postcodeCoords.lat, postcodeCoords.lng);
+        return dA - dB;
+      });
+    }
+    return result;
+  })();
+  const filteredShared = (() => {
+    if (!sharedMatches) return undefined;
+    let result = applyVenueFilter(sharedMatches);
+    if (postcodeCoords && maxDistanceMiles !== null) {
+      const maxMi = maxDistanceMiles;
+      result = result
+        .map((m) => ({
+          ...m,
+          screenings: m.screenings.filter((s) => {
+            const vc = VENUE_COORDS[s.venue];
+            if (!vc) return true;
+            return distanceMiles(postcodeCoords.lat, postcodeCoords.lng, vc.lat, vc.lng) <= maxMi;
+          }),
+        }))
+        .filter((m) => m.screenings.length > 0);
+    }
+    if (postcodeCoords && sortByDistance) {
+      result = [...result].sort((a, b) => {
+        const dA = nearestVenueDistance(a.screenings, postcodeCoords.lat, postcodeCoords.lng);
+        const dB = nearestVenueDistance(b.screenings, postcodeCoords.lat, postcodeCoords.lng);
+        return dA - dB;
+      });
+    }
+    return result;
+  })();
+
+  const filteredPartial = (() => {
+    if (!partialMatches) return undefined;
+    let result = applyVenueFilter(partialMatches);
+    if (postcodeCoords && maxDistanceMiles !== null) {
+      const maxMi = maxDistanceMiles;
+      result = result
+        .map((m) => ({
+          ...m,
+          screenings: m.screenings.filter((s) => {
+            const vc = VENUE_COORDS[s.venue];
+            if (!vc) return true;
+            return distanceMiles(postcodeCoords.lat, postcodeCoords.lng, vc.lat, vc.lng) <= maxMi;
+          }),
+        }))
+        .filter((m) => m.screenings.length > 0);
+    }
+    if (postcodeCoords && sortByDistance) {
+      result = [...result].sort((a, b) => {
+        const dA = nearestVenueDistance(a.screenings, postcodeCoords.lat, postcodeCoords.lng);
+        const dB = nearestVenueDistance(b.screenings, postcodeCoords.lat, postcodeCoords.lng);
+        return dA - dB;
+      });
+    }
+    return result;
+  })();
 
   // Flattened screenings for the calendar view
   // In together mode use filteredShared (intersection only) to match the list view
@@ -375,6 +472,45 @@ function HomeInner() {
     const content = generateIcsFile(events);
     downloadIcs(content, "cineboxd-screenings.ics");
   }, [filteredMatches]);
+
+  const geocodePostcode = useCallback(async (pc: string) => {
+    const clean = pc.trim().replace(/\s+/g, "");
+    if (!clean) {
+      setPostcodeCoords(null);
+      setPostcodeError(null);
+      localStorage.removeItem("cineboxd_postcode");
+      return;
+    }
+    setPostcodeLoading(true);
+    setPostcodeError(null);
+    try {
+      const res = await fetch(
+        `https://api.postcodes.io/postcodes/${encodeURIComponent(clean)}`
+      );
+      const json = await res.json();
+      if (json.status === 200 && json.result) {
+        setPostcodeCoords({ lat: json.result.latitude, lng: json.result.longitude });
+        localStorage.setItem("cineboxd_postcode", pc.trim());
+      } else {
+        setPostcodeError("Postcode not found");
+        setPostcodeCoords(null);
+      }
+    } catch {
+      setPostcodeError("Could not look up postcode");
+      setPostcodeCoords(null);
+    } finally {
+      setPostcodeLoading(false);
+    }
+  }, []);
+
+  const clearPostcode = useCallback(() => {
+    setPostcode("");
+    setPostcodeCoords(null);
+    setPostcodeError(null);
+    setSortByDistance(false);
+    setMaxDistanceMiles(null);
+    localStorage.removeItem("cineboxd_postcode");
+  }, []);
 
   const handleShare = useCallback(() => {
     navigator.clipboard.writeText(window.location.href);
@@ -423,6 +559,70 @@ function HomeInner() {
       </div>
     );
   };
+
+  const renderLocationControls = () => (
+    <div className="flex flex-wrap items-center gap-3">
+      <form
+        onSubmit={(e) => { e.preventDefault(); geocodePostcode(postcode); }}
+        className="flex items-center gap-2"
+      >
+        <span className="text-sm text-muted shrink-0">Near</span>
+        <input
+          type="text"
+          value={postcode}
+          onChange={(e) => setPostcode(e.target.value.toUpperCase())}
+          placeholder="Postcode"
+          maxLength={8}
+          className="w-24 bg-card border border-border rounded-lg px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+        />
+        <button
+          type="submit"
+          disabled={postcodeLoading || !postcode.trim()}
+          className="bg-card border border-border rounded-lg px-3 py-1.5 text-sm text-muted hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+        >
+          {postcodeLoading ? "..." : "Go"}
+        </button>
+        {postcodeCoords && (
+          <button
+            type="button"
+            onClick={clearPostcode}
+            className="text-xs text-muted hover:text-foreground transition-colors cursor-pointer"
+          >
+            Clear
+          </button>
+        )}
+      </form>
+      {postcodeCoords && (
+        <>
+          <label className="flex items-center gap-1.5 text-sm text-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={sortByDistance}
+              onChange={(e) => setSortByDistance(e.target.checked)}
+            />
+            Sort by distance
+          </label>
+          <select
+            value={maxDistanceMiles ?? ""}
+            onChange={(e) =>
+              setMaxDistanceMiles(e.target.value ? Number(e.target.value) : null)
+            }
+            className="bg-card border border-border rounded-lg px-3 py-1.5 text-sm"
+          >
+            <option value="">Any distance</option>
+            <option value="1">≤ 1 mile</option>
+            <option value="2">≤ 2 miles</option>
+            <option value="3">≤ 3 miles</option>
+            <option value="5">≤ 5 miles</option>
+            <option value="10">≤ 10 miles</option>
+          </select>
+        </>
+      )}
+      {postcodeError && (
+        <span className="text-sm text-red-400">{postcodeError}</span>
+      )}
+    </div>
+  );
 
   const renderFilmCard = (match: MatchedScreening, index: number) => {
     const meta = match.metadata;
@@ -514,6 +714,18 @@ function HomeInner() {
             >
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-muted">{s.venue}</span>
+                {postcodeCoords && !!VENUE_COORDS[s.venue] && (
+                  <span className="text-xs text-muted/60">
+                    {formatDistance(
+                      distanceMiles(
+                        postcodeCoords.lat,
+                        postcodeCoords.lng,
+                        VENUE_COORDS[s.venue].lat,
+                        VENUE_COORDS[s.venue].lng
+                      )
+                    )}
+                  </span>
+                )}
                 <span>
                   {new Date(s.date + "T00:00:00").toLocaleDateString(
                     "en-GB",
@@ -881,6 +1093,9 @@ function HomeInner() {
                   </div>
                 </div>
 
+                {/* Location filter — postcode, sort by distance, max distance */}
+                {renderLocationControls()}
+
                 {viewMode === "calendar" ? (
                   <Calendar
                     screenings={flatScreenings}
@@ -1036,6 +1251,9 @@ function HomeInner() {
                     </button>
                   </div>
                 </div>
+
+                {/* Location filter — postcode, sort by distance, max distance */}
+                {renderLocationControls()}
 
                 {/* CSV upload nudge */}
                 {!username && (

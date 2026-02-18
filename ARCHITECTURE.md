@@ -38,14 +38,16 @@ cineboxd/
 │   │   └── calendar.tsx              # Monthly calendar view for screenings
 │   │
 │   ├── lib/                          # Shared utilities
-│   │   ├── types.ts                  # TypeScript interfaces (WatchlistFilm, Screening, etc.)
+│   │   ├── types.ts                  # TypeScript interfaces (WatchlistFilm, Screening, Subscription, etc.)
 │   │   ├── cache.ts                  # In-memory cache with 6-hour TTL
 │   │   ├── csv-parser.ts             # Parses Letterboxd CSV exports into WatchlistFilm[]
 │   │   ├── letterboxd-rss.ts         # Fetches watchlist from Letterboxd by username (HTML scraping)
 │   │   ├── matcher.ts                # Fuzzy film title matching (exact → Fuse.js → token overlap)
 │   │   ├── tmdb.ts                   # TMDB API client (posters, ratings, director, IMDb ID)
 │   │   ├── rate-limit.ts             # In-memory sliding-window rate limiter (10 req/60s per IP)
-│   │   └── ics.ts                    # Generates ICS calendar files for screenings
+│   │   ├── ics.ts                    # Generates ICS calendar files for screenings
+│   │   ├── subscriptions.ts          # JSON-file subscription store (read/write/add/remove)
+│   │   └── venues.ts                 # Hardcoded venue coordinates + Haversine distance utilities
 │   │
 │   └── scrapers/                     # Cinema listing scrapers
 │       ├── index.ts                  # Runs all scrapers in parallel, collects results
@@ -542,3 +544,53 @@ Example Vercel cron configuration (`vercel.json`):
 }
 ```
 Note: Vercel Cron does not support custom headers, so for production use a third-party cron service that supports bearer auth headers, or an intermediate serverless function.
+
+---
+
+## Location-Based Venue Filtering
+
+### Overview
+
+Users can enter a UK postcode to filter and sort results by proximity to each cinema. No browser geolocation is requested — the feature is entirely opt-in via a text input. The postcode is saved to `localStorage` so it persists across sessions.
+
+### Source File
+
+`src/lib/venues.ts` — hardcoded lat/lng coordinates for each venue, Haversine distance function, distance formatter, and a helper to find the nearest venue in a set of screenings.
+
+### Venue Coordinates
+
+Coordinates are hardcoded (there are only 5 venues). Keys must exactly match the `venue` string emitted by each scraper:
+
+| Venue string | Address |
+|---|---|
+| `"Prince Charles Cinema"` | 7 Leicester Place, WC2H 7BY |
+| `"Close-Up Film Centre"` | 97 Sclater Street, E1 6HR |
+| `"ICA Cinema"` | The Mall, SW1Y 5AH |
+| `"Barbican Cinema"` | Barbican Centre, Silk St, EC2Y 8DS |
+| `"Rio Cinema"` | 107 Kingsland High St, E8 2PB |
+
+To add a new venue: add its scraper's `venue` constant as a key in `VENUE_COORDS` in `venues.ts`.
+
+### Geocoding
+
+Postcodes are resolved to lat/lng client-side via [postcodes.io](https://postcodes.io) — a free, no-auth UK postcode API:
+
+```
+GET https://api.postcodes.io/postcodes/<postcode>
+→ { status: 200, result: { latitude, longitude } }
+```
+
+No API key required. UK postcodes only.
+
+### Client-Side Logic (page.tsx)
+
+1. On mount: load saved postcode from `localStorage` and immediately geocode it.
+2. On postcode form submit: geocode the entered postcode; on success, save to `localStorage`.
+3. **Max distance filter:** applied to `filteredMatches` — each match's screenings are filtered to venues within the chosen mile radius; matches with no remaining screenings are dropped.
+4. **Sort by distance:** matches are re-sorted by the distance to their nearest venue.
+5. **Distance badge:** each screening row shows the distance from the user's postcode to that venue (e.g. `"1.2 mi"`).
+6. "Clear" button removes the postcode from state and `localStorage` and resets sort/filter.
+
+### No New Environment Variables or API Routes
+
+Everything runs client-side. No server changes were needed.
