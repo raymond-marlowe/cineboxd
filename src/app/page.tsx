@@ -62,6 +62,10 @@ function HomeInner() {
   const [groupUsernames, setGroupUsernames] = useState<string[]>(["", ""]);
   const [partialExpanded, setPartialExpanded] = useState(false);
 
+  // Screenings drawer state
+  const [drawerMatch, setDrawerMatch] = useState<MatchedScreening | null>(null);
+  const [drawerVenueExpanded, setDrawerVenueExpanded] = useState<Record<string, boolean>>({});
+
   const handleUsername = useCallback(
     async (name: string) => {
       const trimmed = name.trim();
@@ -625,8 +629,106 @@ function HomeInner() {
     </div>
   );
 
+  const renderScreeningRow = (s: Screening, filmTitle: string, j: number) => (
+    <div
+      key={j}
+      className="flex items-center justify-between gap-3 text-sm bg-background/50 rounded-lg px-3 py-2"
+    >
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-muted">{s.venue}</span>
+        {postcodeCoords && !!VENUE_COORDS[s.venue] && (
+          <span className="text-xs text-muted/60">
+            {formatDistance(
+              distanceMiles(
+                postcodeCoords.lat,
+                postcodeCoords.lng,
+                VENUE_COORDS[s.venue].lat,
+                VENUE_COORDS[s.venue].lng
+              )
+            )}
+          </span>
+        )}
+        <span>
+          {new Date(s.date + "T00:00:00").toLocaleDateString(
+            "en-GB",
+            {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+            }
+          )}
+        </span>
+        <span className="font-mono">{s.time}</span>
+        {s.format && (
+          <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full font-medium">
+            {s.format}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={() => handleDownloadSingleIcs(s, filmTitle)}
+          className="text-muted hover:text-accent transition-colors cursor-pointer"
+          title="Download ICS"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+        </button>
+        {s.bookingUrl ? (
+          <a
+            href={s.bookingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent hover:underline font-medium"
+          >
+            Book
+          </a>
+        ) : (
+          <span className="text-muted text-xs">
+            Sold out
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  const getSortedScreenings = (screenings: Screening[]) => {
+    if (postcodeCoords && sortByDistance) {
+      return [...screenings].sort((a, b) => {
+        const vcA = VENUE_COORDS[a.venue];
+        const vcB = VENUE_COORDS[b.venue];
+        const dA = vcA ? distanceMiles(postcodeCoords.lat, postcodeCoords.lng, vcA.lat, vcA.lng) : Infinity;
+        const dB = vcB ? distanceMiles(postcodeCoords.lat, postcodeCoords.lng, vcB.lat, vcB.lng) : Infinity;
+        if (dA !== dB) return dA - dB;
+        return (a.date + a.time).localeCompare(b.date + b.time);
+      });
+    }
+    return [...screenings].sort((a, b) =>
+      (a.date + a.time).localeCompare(b.date + b.time)
+    );
+  };
+
   const renderFilmCard = (match: MatchedScreening, index: number) => {
     const meta = match.metadata;
+    const PREVIEW_COUNT = 3;
+    const sortedScreenings = getSortedScreenings(match.screenings);
+    const previewScreenings = sortedScreenings.slice(0, PREVIEW_COUNT);
+    const hasMore = sortedScreenings.length > PREVIEW_COUNT;
+
     return (
       <div
         key={index}
@@ -708,86 +810,126 @@ function HomeInner() {
         </div>
 
         <div className="grid gap-2">
-          {match.screenings.map((s, j) => (
-            <div
-              key={j}
-              className="flex items-center justify-between gap-3 text-sm bg-background/50 rounded-lg px-3 py-2"
-            >
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-muted">{s.venue}</span>
-                {postcodeCoords && !!VENUE_COORDS[s.venue] && (
-                  <span className="text-xs text-muted/60">
-                    {formatDistance(
-                      distanceMiles(
-                        postcodeCoords.lat,
-                        postcodeCoords.lng,
-                        VENUE_COORDS[s.venue].lat,
-                        VENUE_COORDS[s.venue].lng
-                      )
-                    )}
-                  </span>
-                )}
-                <span>
-                  {new Date(s.date + "T00:00:00").toLocaleDateString(
-                    "en-GB",
-                    {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    }
-                  )}
-                </span>
-                <span className="font-mono">{s.time}</span>
-                {s.format && (
-                  <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full font-medium">
-                    {s.format}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() =>
-                    handleDownloadSingleIcs(s, match.film.title)
-                  }
-                  className="text-muted hover:text-accent transition-colors cursor-pointer"
-                  title="Download ICS"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                </button>
-                {s.bookingUrl ? (
-                  <a
-                    href={s.bookingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent hover:underline font-medium"
-                  >
-                    Book
-                  </a>
-                ) : (
-                  <span className="text-muted text-xs">
-                    Sold out
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
+          {previewScreenings.map((s, j) => renderScreeningRow(s, match.film.title, j))}
         </div>
+
+        {hasMore && (
+          <button
+            onClick={() => {
+              setDrawerMatch(match);
+              setDrawerVenueExpanded({});
+            }}
+            className="mt-2 w-full text-sm text-muted hover:text-foreground transition-colors text-left px-1 cursor-pointer"
+          >
+            Show all screenings ({sortedScreenings.length}) →
+          </button>
+        )}
       </div>
+    );
+  };
+
+  const renderDrawer = () => {
+    if (!drawerMatch) return null;
+    const allScreenings = getSortedScreenings(drawerMatch.screenings);
+    // Group by venue, within each venue sort by time ascending
+    const venueMap = new Map<string, Screening[]>();
+    for (const s of allScreenings) {
+      if (!venueMap.has(s.venue)) venueMap.set(s.venue, []);
+      venueMap.get(s.venue)!.push(s);
+    }
+    // Sort venues: if sortByDistance + coords, by nearest screening; else alphabetical
+    const venueNames = [...venueMap.keys()].sort((a, b) => {
+      if (postcodeCoords && sortByDistance) {
+        const vcA = VENUE_COORDS[a];
+        const vcB = VENUE_COORDS[b];
+        const dA = vcA ? distanceMiles(postcodeCoords.lat, postcodeCoords.lng, vcA.lat, vcA.lng) : Infinity;
+        const dB = vcB ? distanceMiles(postcodeCoords.lat, postcodeCoords.lng, vcB.lat, vcB.lng) : Infinity;
+        return dA - dB;
+      }
+      return a.localeCompare(b);
+    });
+
+    return (
+      <>
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 bg-black/60 z-40"
+          onClick={() => setDrawerMatch(null)}
+        />
+        {/* Drawer panel */}
+        <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-card border-l border-border flex flex-col shadow-2xl">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+            <div>
+              <h2 className="font-semibold text-base">{drawerMatch.film.title}</h2>
+              <p className="text-sm text-muted">{allScreenings.length} screenings</p>
+            </div>
+            <button
+              onClick={() => setDrawerMatch(null)}
+              className="text-muted hover:text-foreground transition-colors cursor-pointer p-1"
+              aria-label="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div className="overflow-y-auto flex-1 px-4 py-3 space-y-2">
+            {venueNames.map((venue) => {
+              const screenings = venueMap.get(venue)!.sort((a, b) =>
+                (a.date + a.time).localeCompare(b.date + b.time)
+              );
+              const expanded = drawerVenueExpanded[venue] !== false; // default open
+              const vc = VENUE_COORDS[venue];
+              const dist = postcodeCoords && vc
+                ? distanceMiles(postcodeCoords.lat, postcodeCoords.lng, vc.lat, vc.lng)
+                : null;
+              return (
+                <div key={venue} className="border border-border rounded-lg overflow-hidden">
+                  <button
+                    onClick={() =>
+                      setDrawerVenueExpanded((prev) => ({
+                        ...prev,
+                        [venue]: !expanded,
+                      }))
+                    }
+                    className="w-full flex items-center justify-between px-4 py-2.5 bg-background/40 hover:bg-background/70 transition-colors cursor-pointer text-left"
+                  >
+                    <span className="font-medium text-sm">
+                      {venue}
+                      {dist !== null && (
+                        <span className="text-muted font-normal ml-2 text-xs">{formatDistance(dist)}</span>
+                      )}
+                    </span>
+                    <span className="flex items-center gap-2 text-muted text-xs shrink-0">
+                      {screenings.length} showing{screenings.length !== 1 ? "s" : ""}
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </span>
+                  </button>
+                  {expanded && (
+                    <div className="px-3 pb-2 pt-1 grid gap-1.5">
+                      {screenings.map((s, j) => renderScreeningRow(s, drawerMatch.film.title, j))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </>
     );
   };
 
@@ -1323,6 +1465,7 @@ function HomeInner() {
           </div>
         )}
       </main>
+      {renderDrawer()}
     </div>
   );
 }
