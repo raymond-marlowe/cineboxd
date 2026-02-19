@@ -4,8 +4,10 @@ import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { MatchedScreening, Screening } from "@/lib/types";
 import { generateIcsEvent, generateIcsFile, downloadIcs } from "@/lib/ics";
+import dynamic from "next/dynamic";
 import Calendar from "@/components/calendar";
 import SupportedVenues from "@/components/SupportedVenues";
+const VenueMap = dynamic(() => import("@/components/venue-map"), { ssr: false });
 import {
   VENUE_COORDS,
   distanceMiles,
@@ -24,7 +26,7 @@ interface MatchResponse {
 }
 
 type AppState = "upload" | "loading" | "results";
-type ViewMode = "list" | "calendar";
+type ViewMode = "list" | "calendar" | "map";
 type InputMode = "solo" | "together";
 
 const USER_COLORS = ["#f59e0b", "#3b82f6", "#10b981", "#8b5cf6", "#ef4444"];
@@ -207,9 +209,25 @@ function HomeInner() {
       setUsername(userParam);
       handleUsername(userParam);
     }
+
+    // Restore view + venue filter from URL
+    const viewParam = searchParams.get("view");
+    if (viewParam === "calendar" || viewParam === "map") setViewMode(viewParam as ViewMode);
+    const venueParam = searchParams.get("venue");
+    if (venueParam) setVenueFilter(venueParam);
     // Only run on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep view= and venue= query params in sync with state so the Share button captures them
+  useEffect(() => {
+    if (state !== "results") return;
+    const params = new URLSearchParams(window.location.search);
+    if (viewMode === "list") params.delete("view"); else params.set("view", viewMode);
+    if (venueFilter === "all") params.delete("venue"); else params.set("venue", venueFilter);
+    const qs = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? "?" + qs : ""));
+  }, [viewMode, venueFilter, state]);
 
   // Restore saved postcode from localStorage on mount
   useEffect(() => {
@@ -1047,6 +1065,16 @@ function HomeInner() {
                       >
                         Calendar
                       </button>
+                      <button
+                        onClick={() => setViewMode("map")}
+                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                          viewMode === "map"
+                            ? "bg-accent text-background font-medium"
+                            : "bg-card text-muted hover:text-foreground"
+                        }`}
+                      >
+                        Map
+                      </button>
                     </div>
 
                     <button
@@ -1092,6 +1120,13 @@ function HomeInner() {
                   <Calendar
                     screenings={flatScreenings}
                     onDownloadIcs={handleDownloadSingleIcs}
+                  />
+                ) : viewMode === "map" ? (
+                  <VenueMap
+                    matches={filteredShared ?? []}
+                    postcodeCoords={postcodeCoords}
+                    maxDistanceMiles={maxDistanceMiles}
+                    onVenueSelect={(v) => { setVenueFilter(v); setViewMode("list"); }}
                   />
                 ) : (
                   <>
@@ -1195,6 +1230,16 @@ function HomeInner() {
                         }`}
                       >
                         Calendar
+                      </button>
+                      <button
+                        onClick={() => setViewMode("map")}
+                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                          viewMode === "map"
+                            ? "bg-accent text-background font-medium"
+                            : "bg-card text-muted hover:text-foreground"
+                        }`}
+                      >
+                        Map
                       </button>
                     </div>
 
@@ -1305,6 +1350,13 @@ function HomeInner() {
                   <Calendar
                     screenings={flatScreenings}
                     onDownloadIcs={handleDownloadSingleIcs}
+                  />
+                ) : viewMode === "map" ? (
+                  <VenueMap
+                    matches={filteredMatches ?? []}
+                    postcodeCoords={postcodeCoords}
+                    maxDistanceMiles={maxDistanceMiles}
+                    onVenueSelect={(v) => { setVenueFilter(v); setViewMode("list"); }}
                   />
                 ) : filteredMatches && filteredMatches.length > 0 ? (
                   <div className="grid gap-4">
