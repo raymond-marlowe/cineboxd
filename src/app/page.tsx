@@ -64,6 +64,9 @@ function HomeInner() {
   const [groupUsernames, setGroupUsernames] = useState<string[]>(["", ""]);
   const [partialExpanded, setPartialExpanded] = useState(false);
 
+  // Expanded screening drawer state: key is film title
+  const [screeningDrawer, setScreeningDrawer] = useState<MatchedScreening | null>(null);
+
   const handleUsername = useCallback(
     async (name: string) => {
       const trimmed = name.trim();
@@ -725,86 +728,101 @@ function HomeInner() {
           </div>
         </div>
 
-        <div className="grid gap-2">
-          {match.screenings.map((s, j) => (
-            <div
-              key={j}
-              className="flex items-center justify-between gap-3 text-sm bg-background/50 rounded-lg px-3 py-2"
-            >
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-muted">{s.venue}</span>
-                {postcodeCoords && !!VENUE_COORDS[s.venue] && (
-                  <span className="text-xs text-muted/60">
-                    {formatDistance(
-                      distanceMiles(
-                        postcodeCoords.lat,
-                        postcodeCoords.lng,
-                        VENUE_COORDS[s.venue].lat,
-                        VENUE_COORDS[s.venue].lng
-                      )
-                    )}
-                  </span>
-                )}
-                <span>
-                  {new Date(s.date + "T00:00:00").toLocaleDateString(
-                    "en-GB",
-                    {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    }
-                  )}
-                </span>
-                <span className="font-mono">{s.time}</span>
-                {s.format && (
-                  <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full font-medium">
-                    {s.format}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() =>
-                    handleDownloadSingleIcs(s, match.film.title)
-                  }
-                  className="text-muted hover:text-accent transition-colors cursor-pointer"
-                  title="Download ICS"
+        {(() => {
+          const LIMIT = 3;
+          const visible = match.screenings.slice(0, LIMIT);
+          const overflow = match.screenings.length - LIMIT;
+          return (
+            <div className="grid gap-2">
+              {visible.map((s, j) => (
+                <div
+                  key={j}
+                  className="flex items-center justify-between gap-3 text-sm bg-background/50 rounded-lg px-3 py-2"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-muted">{s.venue}</span>
+                    {postcodeCoords && !!VENUE_COORDS[s.venue] && (
+                      <span className="text-xs text-muted/60">
+                        {formatDistance(
+                          distanceMiles(
+                            postcodeCoords.lat,
+                            postcodeCoords.lng,
+                            VENUE_COORDS[s.venue].lat,
+                            VENUE_COORDS[s.venue].lng
+                          )
+                        )}
+                      </span>
+                    )}
+                    <span>
+                      {new Date(s.date + "T00:00:00").toLocaleDateString(
+                        "en-GB",
+                        {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        }
+                      )}
+                    </span>
+                    <span className="font-mono">{s.time}</span>
+                    {s.format && (
+                      <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full font-medium">
+                        {s.format}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() =>
+                        handleDownloadSingleIcs(s, match.film.title)
+                      }
+                      className="text-muted hover:text-accent transition-colors cursor-pointer"
+                      title="Download ICS"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                    </button>
+                    {s.bookingUrl ? (
+                      <a
+                        href={s.bookingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent hover:underline font-medium"
+                      >
+                        Book
+                      </a>
+                    ) : (
+                      <span className="text-muted text-xs">
+                        Sold out
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {overflow > 0 && (
+                <button
+                  onClick={() => setScreeningDrawer(match)}
+                  className="text-sm text-muted hover:text-accent transition-colors cursor-pointer text-left py-1"
+                >
+                  Show all screenings ({match.screenings.length})
                 </button>
-                {s.bookingUrl ? (
-                  <a
-                    href={s.bookingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent hover:underline font-medium"
-                  >
-                    Book
-                  </a>
-                ) : (
-                  <span className="text-muted text-xs">
-                    Sold out
-                  </span>
-                )}
-              </div>
+              )}
             </div>
-          ))}
-        </div>
+          );
+        })()}
       </div>
     );
   };
@@ -1028,7 +1046,7 @@ function HomeInner() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     {venues.length > 1 && (
                       <select
                         value={venueFilter}
@@ -1044,10 +1062,10 @@ function HomeInner() {
                       </select>
                     )}
 
-                    <div className="flex rounded-lg border border-border overflow-hidden">
+                    <div className="inline-flex flex-none shrink-0 rounded-lg border border-border overflow-hidden whitespace-nowrap">
                       <button
                         onClick={() => setViewMode("list")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`min-w-[56px] whitespace-nowrap px-3 py-2 text-sm transition-colors cursor-pointer ${
                           viewMode === "list"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
@@ -1057,7 +1075,7 @@ function HomeInner() {
                       </button>
                       <button
                         onClick={() => setViewMode("calendar")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`min-w-[76px] whitespace-nowrap px-3 py-2 text-sm transition-colors cursor-pointer ${
                           viewMode === "calendar"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
@@ -1067,7 +1085,7 @@ function HomeInner() {
                       </button>
                       <button
                         onClick={() => setViewMode("map")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`min-w-[48px] whitespace-nowrap px-3 py-2 text-sm transition-colors cursor-pointer ${
                           viewMode === "map"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
@@ -1194,7 +1212,7 @@ function HomeInner() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     {venues.length > 1 && (
                       <select
                         value={venueFilter}
@@ -1210,10 +1228,10 @@ function HomeInner() {
                       </select>
                     )}
 
-                    <div className="flex rounded-lg border border-border overflow-hidden">
+                    <div className="inline-flex flex-none shrink-0 rounded-lg border border-border overflow-hidden whitespace-nowrap">
                       <button
                         onClick={() => setViewMode("list")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`min-w-[56px] whitespace-nowrap px-3 py-2 text-sm transition-colors cursor-pointer ${
                           viewMode === "list"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
@@ -1223,7 +1241,7 @@ function HomeInner() {
                       </button>
                       <button
                         onClick={() => setViewMode("calendar")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`min-w-[76px] whitespace-nowrap px-3 py-2 text-sm transition-colors cursor-pointer ${
                           viewMode === "calendar"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
@@ -1233,7 +1251,7 @@ function HomeInner() {
                       </button>
                       <button
                         onClick={() => setViewMode("map")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`min-w-[48px] whitespace-nowrap px-3 py-2 text-sm transition-colors cursor-pointer ${
                           viewMode === "map"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
@@ -1375,6 +1393,127 @@ function HomeInner() {
           </div>
         )}
       </main>
+
+      {/* Screening drawer — all screenings grouped by venue, slides in from right */}
+      {screeningDrawer && (() => {
+        const match = screeningDrawer;
+        // Group screenings by venue, sorted by time within each venue
+        const byVenue = new Map<string, typeof match.screenings>();
+        for (const s of match.screenings) {
+          if (!byVenue.has(s.venue)) byVenue.set(s.venue, []);
+          byVenue.get(s.venue)!.push(s);
+        }
+        for (const [, list] of byVenue) {
+          list.sort((a, b) =>
+            (a.date + "T" + a.time).localeCompare(b.date + "T" + b.time)
+          );
+        }
+        const venueEntries = [...byVenue.entries()].sort(([va], [vb]) => {
+          // Sort venues by their earliest screening
+          const earliest = (v: string) =>
+            byVenue.get(v)![0].date + "T" + byVenue.get(v)![0].time;
+          return earliest(va).localeCompare(earliest(vb));
+        });
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-stretch sm:justify-end"
+            onClick={() => setScreeningDrawer(null)}
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/60" />
+            {/* Panel — bottom sheet on mobile, right-side drawer on sm+ */}
+            <div
+              className="relative bg-card border-t border-border sm:border-t-0 sm:border-l rounded-t-2xl sm:rounded-none w-full sm:w-[420px] max-h-[85vh] sm:max-h-full sm:h-full overflow-y-auto p-5 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">{match.film.title}</h3>
+                  <p className="text-sm text-muted">
+                    {match.screenings.length} screening{match.screenings.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setScreeningDrawer(null)}
+                  className="text-muted hover:text-foreground transition-colors cursor-pointer shrink-0 mt-0.5"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              {venueEntries.map(([venue, screenings]) => (
+                <div key={venue}>
+                  <h4 className="text-sm font-medium text-foreground mb-2">{venue}</h4>
+                  <div className="grid gap-2">
+                    {screenings.map((s, j) => (
+                      <div
+                        key={j}
+                        className="flex items-center justify-between gap-3 text-sm bg-background/50 rounded-lg px-3 py-2"
+                      >
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {postcodeCoords && !!VENUE_COORDS[s.venue] && (
+                            <span className="text-xs text-muted/60">
+                              {formatDistance(
+                                distanceMiles(
+                                  postcodeCoords.lat,
+                                  postcodeCoords.lng,
+                                  VENUE_COORDS[s.venue].lat,
+                                  VENUE_COORDS[s.venue].lng
+                                )
+                              )}
+                            </span>
+                          )}
+                          <span>
+                            {new Date(s.date + "T00:00:00").toLocaleDateString("en-GB", {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </span>
+                          <span className="font-mono">{s.time}</span>
+                          {s.format && (
+                            <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full font-medium">
+                              {s.format}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleDownloadSingleIcs(s, match.film.title)}
+                            className="text-muted hover:text-accent transition-colors cursor-pointer"
+                            title="Download ICS"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                              <line x1="16" y1="2" x2="16" y2="6" />
+                              <line x1="8" y1="2" x2="8" y2="6" />
+                              <line x1="3" y1="10" x2="21" y2="10" />
+                            </svg>
+                          </button>
+                          {s.bookingUrl ? (
+                            <a
+                              href={s.bookingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-accent hover:underline font-medium"
+                            >
+                              Book
+                            </a>
+                          ) : (
+                            <span className="text-muted text-xs">Sold out</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
