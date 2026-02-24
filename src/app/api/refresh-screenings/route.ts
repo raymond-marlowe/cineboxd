@@ -38,17 +38,23 @@ if (!secret || auth !== `Bearer ${secret}`) {
   );
 }
 
-  const screenings = await scrapeAll();
-  const updatedAt = new Date().toISOString();
+  try {
+    const screenings = await scrapeAll();
+    const updatedAt = new Date().toISOString();
 
-  await Promise.all([
-    redis.set(SCREENINGS_KEY, screenings, { ex: TTL_24H }),
-    redis.set(SCREENINGS_UPDATED_KEY, updatedAt),
-  ]);
+    await Promise.all([
+      redis.set(SCREENINGS_KEY, screenings, { ex: TTL_24H }),
+      redis.set(SCREENINGS_UPDATED_KEY, updatedAt),
+    ]);
 
-  return NextResponse.json({
-    success: true,
-    count: screenings.length,
-    updatedAt,
-  });
+    return NextResponse.json({
+      success: true,
+      count: screenings.length,
+      updatedAt,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("refresh-screenings error:", err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
