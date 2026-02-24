@@ -27,3 +27,24 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+/* ── Leaflet popup dark theme ─────────────────────────────────────────────── */
+.leaflet-popup-content-wrapper {
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.leaflet-popup-tip {
+  background: var(--card);
+}
+
+.leaflet-popup-close-button {
+  color: var(--muted) !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: var(--foreground) !important;
+}

@@ -63,7 +63,6 @@ function HomeInner() {
   const [mode, setMode] = useState<InputMode>("solo");
   const [groupUsernames, setGroupUsernames] = useState<string[]>(["", ""]);
   const [partialExpanded, setPartialExpanded] = useState(false);
-
   // Screenings drawer state
   const [drawerMatch, setDrawerMatch] = useState<MatchedScreening | null>(null);
   const [drawerVenueExpanded, setDrawerVenueExpanded] = useState<Record<string, boolean>>({});
@@ -1170,7 +1169,7 @@ function HomeInner() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     {venues.length > 1 && (
                       <select
                         value={venueFilter}
@@ -1186,10 +1185,10 @@ function HomeInner() {
                       </select>
                     )}
 
-                    <div className="flex rounded-lg border border-border overflow-hidden">
+                    <div className="inline-flex flex-none shrink-0 rounded-lg border border-border overflow-hidden">
                       <button
                         onClick={() => setViewMode("list")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "list"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
@@ -1199,7 +1198,7 @@ function HomeInner() {
                       </button>
                       <button
                         onClick={() => setViewMode("calendar")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "calendar"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
@@ -1209,7 +1208,7 @@ function HomeInner() {
                       </button>
                       <button
                         onClick={() => setViewMode("map")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "map"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
@@ -1336,7 +1335,7 @@ function HomeInner() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     {venues.length > 1 && (
                       <select
                         value={venueFilter}
@@ -1352,10 +1351,10 @@ function HomeInner() {
                       </select>
                     )}
 
-                    <div className="flex rounded-lg border border-border overflow-hidden">
+                    <div className="inline-flex flex-none shrink-0 rounded-lg border border-border overflow-hidden">
                       <button
                         onClick={() => setViewMode("list")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "list"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
@@ -1365,7 +1364,7 @@ function HomeInner() {
                       </button>
                       <button
                         onClick={() => setViewMode("calendar")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "calendar"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
@@ -1375,7 +1374,7 @@ function HomeInner() {
                       </button>
                       <button
                         onClick={() => setViewMode("map")}
-                        className={`px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "map"
                             ? "bg-accent text-background font-medium"
                             : "bg-card text-muted hover:text-foreground"
