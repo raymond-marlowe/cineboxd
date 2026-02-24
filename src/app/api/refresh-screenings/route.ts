@@ -23,9 +23,20 @@ export async function POST(request: NextRequest) {
   const auth = request.headers.get("authorization");
   const secret = process.env.REFRESH_SECRET;
 
-  if (!secret || auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+if (!secret || auth !== `Bearer ${secret}`) {
+  return NextResponse.json(
+    {
+      error: "Unauthorized",
+      hasSecret: Boolean(secret),
+      authHeaderPresent: Boolean(auth),
+      authStartsWithBearer: typeof auth === "string" ? auth.startsWith("Bearer ") : false,
+      // optional: length checks (still non-sensitive)
+      authLength: typeof auth === "string" ? auth.length : null,
+      secretLength: typeof secret === "string" ? secret.length : null,
+    },
+    { status: 401 }
+  );
+}
 
   const screenings = await scrapeAll();
   const updatedAt = new Date().toISOString();
