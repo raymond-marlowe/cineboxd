@@ -10,7 +10,25 @@ import { scrapeAll } from "@/scrapers";
 import { fetchFilmMetadata } from "@/lib/tmdb";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getCached, setCacheWithTTL } from "@/lib/cache";
-import { WatchlistFilm, MatchedScreening } from "@/lib/types";
+import { WatchlistFilm, MatchedScreening, Screening } from "@/lib/types";
+import { redis, SCREENINGS_KEY, SCREENINGS_UPDATED_KEY } from "@/lib/redis";
+
+const SCREENINGS_TTL = 86400; // seconds
+
+/** Read screenings from Redis; fall back to a live scrape if the cache is empty. */
+async function getScreenings(): Promise<Screening[]> {
+  const cached = await redis.get<Screening[]>(SCREENINGS_KEY);
+  if (cached) {
+    return cached;
+  }
+  console.warn("No cached screenings in Redis — falling back to live scrape");
+  const screenings = await scrapeAll();
+  await Promise.all([
+    redis.set(SCREENINGS_KEY, screenings, { ex: SCREENINGS_TTL }),
+    redis.set(SCREENINGS_UPDATED_KEY, new Date().toISOString()),
+  ]);
+  return screenings;
+}
 
 const LIST_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -110,7 +128,7 @@ export async function POST(request: NextRequest) {
       setCacheWithTTL("list-" + listId_, watchlist, LIST_TTL_MS);
     }
 
-    const screenings = await scrapeAll();
+    const screenings = await getScreenings();
     const matches = matchFilms(watchlist, screenings);
 
     const enriched = process.env.TMDB_API_KEY
@@ -204,7 +222,7 @@ async function handleMultiUser(rawUsernames: unknown[]) {
   const unionWatchlist = Array.from(filmByKey.values());
 
   // Match against screenings
-  const screenings = await scrapeAll();
+  const screenings = await getScreenings();
   const matches = matchFilms(unionWatchlist, screenings);
 
   // Annotate each match with users array
