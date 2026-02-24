@@ -2,7 +2,7 @@
 
 ## 1. Project Overview
 
-Cineboxd is a web app that checks whether any films on your Letterboxd watchlist are currently showing at independent cinemas in London. You either enter your Letterboxd username or upload your watchlist as a CSV file. The app then scrapes upcoming screenings from five London cinemas, matches them against your watchlist using fuzzy title matching, and shows you the results with posters, ratings, and booking links. You can also export screenings to your calendar.
+Cineboxd is a web app that checks whether any films on your Letterboxd watchlist are currently showing at independent cinemas in London. You either enter your Letterboxd username or upload your watchlist as a CSV file. The app reads upcoming screenings from a Redis cache (refreshed daily by a cron job), matches them against your watchlist using fuzzy title matching, and shows you the results with posters, ratings, and booking links. You can also export screenings to your calendar or view them on an interactive map.
 
 ## 2. Tech Stack
 
@@ -16,6 +16,8 @@ Cineboxd is a web app that checks whether any films on your Letterboxd watchlist
 | [Fuse.js](https://www.fusejs.io) | ^7.1.0 | A fuzzy search library — finds approximate matches between film titles even when spelling differs slightly. |
 | [PapaParse](https://www.papaparse.com) | ^5.5.3 | Parses CSV (spreadsheet) files — used to read the Letterboxd watchlist export. |
 | [TMDB API](https://developer.themoviedb.org) | v3 | A free movie database API — provides poster images, plot summaries, directors, and ratings. |
+| [Upstash Redis](https://upstash.com) | 1.36.2 | Serverless Redis — stores the scraped screenings so every user request reads from cache instead of triggering a live scrape. |
+| [Leaflet](https://leafletjs.com) / [react-leaflet](https://react-leaflet.js.org) | ^4 | Interactive map library — powers the Map view showing screening venues as pins. |
 | [Vercel](https://vercel.com) | — | The hosting platform where the app runs in production. |
 | [Geist](https://vercel.com/font) | — | The font used throughout the interface (loaded via `next/font`). |
 
@@ -26,20 +28,25 @@ cineboxd/
 ├── src/
 │   ├── app/                          # Next.js app router (pages + API)
 │   │   ├── api/
-│   │   │   └── match/
-│   │   │       └── route.ts          # POST /api/match — main API endpoint
+│   │   │   ├── match/
+│   │   │   │   └── route.ts          # POST /api/match — main API endpoint
+│   │   │   └── refresh-screenings/
+│   │   │       └── route.ts          # GET/POST /api/refresh-screenings — cache health + scrape trigger
 │   │   ├── about/
 │   │   │   └── page.tsx              # /about — static about page
-│   │   ├── globals.css               # CSS custom properties (colors, fonts)
+│   │   ├── globals.css               # CSS custom properties (colors, fonts, Leaflet overrides)
 │   │   ├── layout.tsx                # Root HTML layout, metadata, footer
-│   │   └── page.tsx                  # / — main page (input, results, calendar)
+│   │   └── page.tsx                  # / — main page (input, results, calendar, map)
 │   │
 │   ├── components/
-│   │   └── calendar.tsx              # Monthly calendar view for screenings
+│   │   ├── calendar.tsx              # Monthly calendar view for screenings
+│   │   ├── venue-map.tsx             # Interactive Leaflet map view (react-leaflet)
+│   │   └── SupportedVenues.tsx       # Chip strip listing all supported cinemas
 │   │
 │   ├── lib/                          # Shared utilities
 │   │   ├── types.ts                  # TypeScript interfaces (WatchlistFilm, Screening, Subscription, etc.)
-│   │   ├── cache.ts                  # In-memory cache with 6-hour TTL
+│   │   ├── cache.ts                  # In-memory cache with TTL (TMDB + shared CSV lists)
+│   │   ├── redis.ts                  # Upstash Redis client singleton + key constants
 │   │   ├── csv-parser.ts             # Parses Letterboxd CSV exports into WatchlistFilm[]
 │   │   ├── letterboxd-rss.ts         # Fetches watchlist from Letterboxd by username (HTML scraping)
 │   │   ├── matcher.ts                # Fuzzy film title matching (exact → Fuse.js → token overlap)
@@ -49,17 +56,26 @@ cineboxd/
 │   │   ├── subscriptions.ts          # JSON-file subscription store (read/write/add/remove)
 │   │   └── venues.ts                 # Hardcoded venue coordinates + Haversine distance utilities
 │   │
-│   └── scrapers/                     # Cinema listing scrapers
+│   └── scrapers/                     # Cinema listing scrapers (14 active)
 │       ├── index.ts                  # Runs all scrapers in parallel, collects results
-│       ├── prince-charles.ts         # Prince Charles Cinema (HTML scraping)
-│       ├── close-up.ts               # Close-Up Film Centre (HTML scraping)
-│       ├── ica.ts                    # ICA Cinema (HTML scraping)
-│       ├── barbican.ts               # Barbican Cinema (HTML scraping)
-│       ├── rio.ts                    # Rio Cinema (embedded JSON extraction)
+│       ├── prince-charles.ts         # Prince Charles Cinema (HTML)
+│       ├── close-up.ts               # Close-Up Film Centre (HTML)
+│       ├── ica.ts                    # ICA Cinema (HTML)
+│       ├── barbican.ts               # Barbican Cinema (HTML)
+│       ├── rio.ts                    # Rio Cinema (embedded JSON)
+│       ├── genesis.ts                # Genesis Cinema (HTML — Admit-One CMS)
+│       ├── arthouse-crouch-end.ts    # Arthouse Crouch End (HTML — Savoy Systems)
+│       ├── act-one.ts                # ActOne Cinema (pre-rendered HTML — Indy Systems SPA)
+│       ├── phoenix.ts                # Phoenix Cinema (two-stage HTML — Savoy Systems)
+│       ├── lexi.ts                   # The Lexi Cinema (embedded JSON — Savoy Systems)
+│       ├── garden.ts                 # Garden Cinema (HTML)
+│       ├── regent-street.ts          # Regent Street Cinema (GraphQL — Indy Systems)
+│       ├── rich-mix.ts               # Rich Mix (two-pass HTML — Spektrix)
+│       ├── jw3.ts                    # JW3 (Spektrix REST API)
 │       └── picturehouse.ts           # Picturehouse Cinemas (DISABLED — API unreliable)
 │
-├── .env.local                        # Environment variables (TMDB_API_KEY)
-├── next.config.ts                    # Next.js configuration (currently empty)
+├── .env.local                        # Environment variables (TMDB_API_KEY, KV_*, REFRESH_SECRET)
+├── next.config.ts                    # Next.js configuration
 ├── tsconfig.json                     # TypeScript compiler configuration
 ├── postcss.config.mjs                # PostCSS config (Tailwind plugin)
 ├── package.json                      # Dependencies and scripts
@@ -90,17 +106,13 @@ Content-Type: application/json
         │         → WatchlistFilm[]
         │
         ▼
-        ├──────── Scrape cinemas (scrapers/index.ts) ──── GET princecharlescinema.com/...
-        │         All 14 scrapers run in parallel          GET closeupfilmcentre.com/...
-        │         Failed scrapers are silently skipped     GET ica.art/...
-        │         Results cached for 6 hours               GET barbican.org.uk/...
-        │         → Screening[]                            GET riocinema.org.uk/...
-        │                                                  GET genesiscinema.co.uk/...
-        │                                                  GET arthousecrouchend.co.uk/...
-        │                                                  GET actonecinema.co.uk/...
-        │                                                  GET phoenixcinema.co.uk/ (+ N film pages)
-        │                                                  GET thelexicinema.co.uk/...
-        │                                                  GET thegardencinema.co.uk/...
+        ├──────── Read screenings (redis.ts) ──────────── Redis GET screenings:v1
+        │         If cache hit → use cached Screening[]    (populated by /api/refresh-screenings)
+        │         If cache miss → live scrape (fallback):
+        │           All 14 scrapers run in parallel
+        │           Failed scrapers are silently skipped
+        │           Results written to Redis (24h TTL)
+        │         → Screening[]
         │
         ▼
         ├──────── Match films (matcher.ts)
@@ -204,8 +216,8 @@ JSON response ──────────────────────
 | API entry point + rate limiting | `api/match/route.ts`, `rate-limit.ts` |
 | Watchlist from username | `letterboxd-rss.ts` |
 | Watchlist from CSV | `csv-parser.ts` |
-| Cinema scraping | `scrapers/index.ts`, `prince-charles.ts`, `close-up.ts`, `ica.ts`, `barbican.ts`, `rio.ts`, `genesis.ts`, `arthouse-crouch-end.ts`, `act-one.ts`, `phoenix.ts`, `lexi.ts`, `garden.ts` |
-| Scraper caching | `cache.ts` |
+| Screenings cache read | `redis.ts`, `api/match/route.ts` |
+| Cinema scraping (fallback / cron) | `scrapers/index.ts`, `prince-charles.ts`, `close-up.ts`, `ica.ts`, `barbican.ts`, `rio.ts`, `genesis.ts`, `arthouse-crouch-end.ts`, `act-one.ts`, `phoenix.ts`, `lexi.ts`, `garden.ts`, `regent-street.ts`, `rich-mix.ts`, `jw3.ts` |
 | Film matching | `matcher.ts`, `csv-parser.ts` (for `normalizeTitle`) |
 | TMDB enrichment | `tmdb.ts`, `cache.ts` |
 | Results display | `page.tsx`, `calendar.tsx` |
@@ -484,14 +496,17 @@ Film matching happens in `src/lib/matcher.ts` and uses a three-stage pipeline:
 
 ## 7. Caching
 
-### Scraper cache (`src/lib/cache.ts`)
-- **Storage:** In-memory `Map` (resets on server restart / cold start)
-- **TTL:** 6 hours
-- **Keys:** `prince-charles`, `close-up`, `ica`, `barbican`, `rio`
-- **What's cached:** The full `Screening[]` array from each scraper
-- **Cleanup:** Expired entries are deleted lazily when `getCached()` is called
+### Screenings cache (`src/lib/redis.ts` — Upstash Redis)
+- **Storage:** Upstash Redis (persistent, shared across all serverless instances)
+- **TTL:** 24 hours (`ex: 86400`)
+- **Keys:** `screenings:v1` (the `Screening[]` array), `screenings:updated_at` (ISO timestamp)
+- **What's cached:** The full merged `Screening[]` result from all 14 scrapers
+- **Populated by:** `POST /api/refresh-screenings` (intended to be called by a daily cron job)
+- **Read by:** `GET /api/match` — if the key exists, the live scrape is skipped entirely
+- **Fallback:** If `screenings:v1` is missing (first deploy, cache expired), `/api/match` falls back to a live scrape and writes the result back to Redis
+- **Cooldown:** `POST /api/refresh-screenings` returns `{ skipped: true }` if `screenings:updated_at` is less than 30 minutes old, preventing redundant scrapes from rapid cron retries
 
-### TMDB cache (same `cache.ts`)
+### TMDB cache (`src/lib/cache.ts` — in-memory)
 - **Keys:** `tmdb-{normalized-title}-{year-or-unknown}` (e.g. `tmdb-cure-1997`)
 - **What's cached:** `FilmMetadata` objects (poster path, overview, director, rating, IMDb ID)
 - **TTL:** Same 6 hours
@@ -508,17 +523,21 @@ Film matching happens in `src/lib/matcher.ts` and uses a three-stage pipeline:
 - **Not technically a cache** — tracks request history rather than caching responses
 
 ### Important notes
-- All caches are in-memory and reset on every deploy or serverless cold start
-- On Vercel, serverless functions may have separate memory spaces, so cache hits are not guaranteed across invocations
-- There is no cache invalidation mechanism other than TTL expiry
+- The screenings cache is in Redis and persists across deploys and cold starts
+- TMDB, rate limit, and shared list caches are in-memory and reset on every cold start
+- On Vercel, in-memory caches are per-instance — not shared across concurrent function invocations
+- There is no cache invalidation mechanism other than TTL expiry and the 30-minute cooldown on the refresh endpoint
 
 ## 8. Environment Variables
 
 | Variable | Required | Description | Where to get it |
 |---|---|---|---|
-| `TMDB_API_KEY` | Yes (for metadata) | API key for The Movie Database. Without it, films display without posters, ratings, or director info. The app still works but results are less rich. | Sign up at [themoviedb.org](https://www.themoviedb.org/settings/api) and request an API key (free for non-commercial use). |
+| `TMDB_API_KEY` | Recommended | API key for The Movie Database. Without it, films display without posters, ratings, or director info. The app still works but results are less rich. | Sign up at [themoviedb.org](https://www.themoviedb.org/settings/api) and request an API key (free for non-commercial use). |
+| `KV_REST_API_URL` | Recommended | Upstash Redis REST endpoint URL. Without it, every `/api/match` request triggers a live scrape (~10s). | Create a free database at [upstash.com](https://upstash.com), then copy the REST URL from the database dashboard. |
+| `KV_REST_API_TOKEN` | Recommended | Upstash Redis REST token (paired with `KV_REST_API_URL`). | Same Upstash dashboard as above. |
+| `REFRESH_SECRET` | Yes (for cron) | Bearer token required to call `POST /api/refresh-screenings`. Prevents unauthorized cache refreshes. | Generate any random string (e.g. `openssl rand -hex 32`). |
 
-No other environment variables are used. All scraper URLs are hardcoded.
+All scraper URLs are hardcoded. The `RESEND_*` and `NOTIFY_SECRET` variables for the email subscription feature are documented separately in the Weekly Email Subscription section.
 
 ## 9. How to Run Locally
 
@@ -532,8 +551,11 @@ npm install
 
 # 3. Create environment file
 cp .env.local.example .env.local
-# Or create .env.local manually with:
+# Or create .env.local manually:
 # TMDB_API_KEY=your_tmdb_api_key_here
+# KV_REST_API_URL=https://your-db.upstash.io      (optional locally — app falls back to live scrape)
+# KV_REST_API_TOKEN=your_token_here
+# REFRESH_SECRET=any_random_secret
 
 # 4. Start development server
 npm run dev
@@ -557,8 +579,17 @@ npm run dev
 
 1. Push the repo to GitHub
 2. Import the project in [Vercel](https://vercel.com/new)
-3. Set the environment variable `TMDB_API_KEY` in Vercel's project settings → Environment Variables
+3. Set environment variables in Vercel's project settings → Environment Variables:
+   - `TMDB_API_KEY` — movie metadata
+   - `KV_REST_API_URL` + `KV_REST_API_TOKEN` — Upstash Redis (create a free database at upstash.com)
+   - `REFRESH_SECRET` — bearer token for the scrape cron job
 4. Deploy — Vercel auto-detects Next.js and configures the build
+5. Set up a daily cron job to keep screenings fresh:
+   ```bash
+   curl -X POST https://your-domain.com/api/refresh-screenings \
+     -H "Authorization: Bearer <REFRESH_SECRET>"
+   ```
+   Use a service like [cron-job.org](https://cron-job.org), GitHub Actions, or Vercel Cron.
 
 ### DNS (if using a custom domain)
 
@@ -570,8 +601,9 @@ npm run dev
 | Variable | Where to set |
 |---|---|
 | `TMDB_API_KEY` | Vercel → Project Settings → Environment Variables |
-
-No other configuration is needed. The `next.config.ts` is empty — there are no custom rewrites, redirects, or headers.
+| `KV_REST_API_URL` | Vercel → Project Settings → Environment Variables |
+| `KV_REST_API_TOKEN` | Vercel → Project Settings → Environment Variables |
+| `REFRESH_SECRET` | Vercel → Project Settings → Environment Variables |
 
 ## 11. Current Status
 
@@ -583,11 +615,13 @@ No other configuration is needed. The `next.config.ts` is empty — there are no
 - **Film matching:** Three-stage matching pipeline (exact, fuzzy, token overlap) with year validation
 - **TMDB enrichment:** Posters, directors, ratings, plot summaries, IMDb/Letterboxd links
 - **Calendar view:** Monthly calendar with screening indicators and day expansion
+- **Map view:** Interactive Leaflet map showing venue pins with screening counts; click a pin to see upcoming screenings for that venue
 - **ICS export:** Download individual or all screenings as calendar events
 - **Venue filtering:** Filter results by cinema
 - **Rate limiting:** 10 requests per minute per IP
 - **Watch together:** Enter 2-5 Letterboxd usernames to find films on all/some watchlists that are currently screening, with shared/partial split and per-user colour indicators
 - **Shareable result URLs:** All results pages have a Share button that copies the current URL. Solo (`?user=`), together (`?users=`), and CSV (`?list=`) results all auto-load from URL on page visit. CSV shared links expire after 24 hours.
+- **Redis screenings cache:** Scraped screenings are stored in Upstash Redis and refreshed daily via `POST /api/refresh-screenings`. User requests read from cache instead of triggering a live scrape.
 
 ### Scrapers
 
@@ -595,9 +629,18 @@ No other configuration is needed. The `next.config.ts` is empty — there are no
 |---|---|---|---|
 | Prince Charles Cinema | Active | High | Stable HTML structure, good data quality |
 | Barbican Cinema | Active | High | Well-structured BEM markup |
-| Rio Cinema | Active | High | Structured JSON data, but extraction method is fragile |
+| Rio Cinema | Active | High | Embedded JSON, stable but fragile extraction |
+| The Lexi Cinema | Active | High | Embedded JSON (Savoy Systems) |
+| Garden Cinema | Active | High | Semantic HTML with data attributes |
+| Rich Mix | Active | High | Standard two-pass HTML (Spektrix) |
+| JW3 | Active | High | Public Spektrix REST API |
+| Genesis Cinema | Active | High | Stable panel IDs (Admit-One CMS) |
 | Close-Up Film Centre | Active | Medium | Fragile CSS selectors, no year data |
 | ICA Cinema | Active | Medium | Date-finding heuristic walks siblings backwards |
+| Arthouse Crouch End | Active | Medium | WordPress/Elementor — class names may change |
+| Phoenix Cinema | Active | Medium | Two-stage Savoy Systems scrape |
+| Regent Street Cinema | Active | Medium-high | GraphQL (Indy Systems) — two round-trips per film |
+| ActOne Cinema | Active | Medium | Pre-rendered HTML only (Indy Systems SPA) — today only |
 | Picturehouse Cinemas | Disabled | — | API data didn't match website |
 | Everyman Cinema | Not built | — | Client-side rendered, not scrapable |
 
@@ -606,8 +649,8 @@ No other configuration is needed. The `next.config.ts` is empty — there are no
 - **Cloudflare:** Letterboxd's RSS feed is blocked by Cloudflare challenges from server-side requests. The app scrapes the HTML watchlist page instead, which works but returns 28 films per page (requiring pagination for large watchlists).
 - **Private watchlists:** If a user's Letterboxd watchlist is set to private, the app cannot access it and shows an error.
 - **Scraper fragility:** All scrapers depend on specific HTML structures. Any cinema website redesign will break its scraper until updated.
-- **In-memory cache:** Caches reset on every deploy and are not shared across serverless function instances on Vercel.
-- **Rate limiting:** Also in-memory and per-instance — not globally enforced across Vercel's distributed infrastructure.
+- **In-memory caches:** TMDB and rate-limit caches reset on every deploy/cold start and are not shared across serverless function instances on Vercel. The screenings cache is in Redis and is unaffected.
+- **Rate limiting:** In-memory and per-instance — not globally enforced across Vercel's distributed infrastructure.
 - **No year data from some scrapers:** Close-Up and ICA don't provide release years, which can cause incorrect matches for remakes or films with similar titles.
 - **Fixed 2-hour ICS duration:** All calendar events assume a 2-hour runtime regardless of actual film length.
 
@@ -665,7 +708,7 @@ Detection: `process.env.VERCEL ? '/tmp' : path.join(process.cwd(), 'data')`
 POST /api/notify (Authorization: Bearer <NOTIFY_SECRET>)
   │
   ├─ readSubscriptions()          → load all subscribers from JSON file
-  ├─ scrapeAll()                  → fetch current London cinema listings
+  ├─ scrapeAll()                  → fetch current London cinema listings (live scrape; does not read Redis)
   │
   └─ for each subscriber (parallel):
        ├─ fetchWatchlistByUsername(username)
@@ -714,7 +757,7 @@ Users can enter a UK postcode to filter and sort results by proximity to each ci
 
 ### Venue Coordinates
 
-Coordinates are hardcoded (there are only 5 venues). Keys must exactly match the `venue` string emitted by each scraper:
+Coordinates are hardcoded. Keys must exactly match the `venue` string emitted by each scraper:
 
 | Venue string | Address |
 |---|---|
@@ -723,6 +766,15 @@ Coordinates are hardcoded (there are only 5 venues). Keys must exactly match the
 | `"ICA Cinema"` | The Mall, SW1Y 5AH |
 | `"Barbican Cinema"` | Barbican Centre, Silk St, EC2Y 8DS |
 | `"Rio Cinema"` | 107 Kingsland High St, E8 2PB |
+| `"Genesis Cinema"` | 93-95 Mile End Rd, E1 4UJ |
+| `"Arthouse Crouch End"` | 159A Tottenham Lane, N8 9BT |
+| `"ActOne Cinema"` | 3 Medieval Street, SE1 2BY |
+| `"Phoenix Cinema"` | 52 High Rd, N2 9PJ |
+| `"The Lexi Cinema"` | 194B Chamberlayne Rd, NW10 3JU |
+| `"Garden Cinema"` | 22-23 Great Newport St, WC2H 7JS |
+| `"Regent Street Cinema"` | 309 Regent St, W1B 2UW |
+| `"Rich Mix"` | 35-47 Bethnal Green Rd, E1 6LA |
+| `"JW3"` | 341-351 Finchley Rd, NW3 6ET |
 
 To add a new venue: add its scraper's `venue` constant as a key in `VENUE_COORDS` in `venues.ts`.
 

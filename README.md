@@ -2,7 +2,7 @@
 
 Find your Letterboxd watchlist films screening at London's independent cinemas.
 
-Enter your Letterboxd username (or upload a CSV export) and see which films on your watchlist are currently showing at Prince Charles Cinema, Barbican, ICA, Close-Up Film Centre, and Rio Cinema — with posters, ratings, booking links, and calendar export.
+Enter your Letterboxd username (or upload a CSV export) and see which films on your watchlist are currently showing at 14 London independent cinemas — with posters, ratings, booking links, calendar export, and a map view.
 
 <!-- ![Screenshot](screenshot.png) -->
 
@@ -18,20 +18,24 @@ Get a free TMDB API key at [themoviedb.org/settings/api](https://www.themoviedb.
 
 Open [localhost:3000](http://localhost:3000).
 
+For the screenings cache (optional but recommended in production), set `KV_REST_API_URL` and `KV_REST_API_TOKEN` from an [Upstash Redis](https://upstash.com) database. Without these, the app falls back to a live scrape on every request.
+
 ## How it works
 
 1. Fetches your public Letterboxd watchlist (or parses your CSV export)
-2. Scrapes upcoming screenings from 5 London cinemas in parallel
+2. Reads upcoming screenings from Redis cache (populated by `/api/refresh-screenings`; falls back to a live scrape if cache is empty)
 3. Matches films using fuzzy title matching with year validation
 4. Enriches results with posters, directors, and ratings from TMDB
 
 ## Features
 
 - **Username or CSV** — enter your Letterboxd username or upload a watchlist CSV
+- **Watch together** — enter 2–5 Letterboxd usernames to find films on all (or some) watchlists that are currently screening
 - **Bookmarkable** — URLs like `/?user=yourname` auto-load results
 - **Calendar export** — download screenings as ICS files
-- **Two views** — list view with film cards or monthly calendar view
+- **Three views** — list view with film cards, monthly calendar view, or interactive map view
 - **Venue filtering** — filter results by cinema
+- **Location filtering** — enter a UK postcode to filter and sort by distance
 
 ## Architecture
 
@@ -39,11 +43,17 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full technical documentation: data fl
 
 ## Deploy
 
-Push to GitHub and import in [Vercel](https://vercel.com). Set `TMDB_API_KEY` in environment variables. That's it.
+Push to GitHub and import in [Vercel](https://vercel.com). Set environment variables in Vercel project settings:
+
+| Variable | Required | Description |
+|---|---|---|
+| `TMDB_API_KEY` | Recommended | Enables posters, ratings, and director info |
+| `KV_REST_API_URL` | Recommended | Upstash Redis REST URL |
+| `KV_REST_API_TOKEN` | Recommended | Upstash Redis REST token |
+| `REFRESH_SECRET` | Yes (for cron) | Bearer token for `POST /api/refresh-screenings` |
+
+Set up a daily cron job to call `POST /api/refresh-screenings` with `Authorization: Bearer <REFRESH_SECRET>` to keep screenings fresh.
 
 ## Built with
 
-Next.js, React, Tailwind CSS, Cheerio, Fuse.js, TMDB API.
-
-
-
+Next.js, React, Tailwind CSS, Cheerio, Fuse.js, TMDB API, Upstash Redis, Leaflet.

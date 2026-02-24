@@ -27,6 +27,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Cooldown: skip if last scrape was less than 30 minutes ago
+  const lastUpdated = await redis.get<string>(SCREENINGS_UPDATED_KEY);
+  if (lastUpdated) {
+    const ageMs = Date.now() - new Date(lastUpdated).getTime();
+    if (ageMs < 30 * 60 * 1000) {
+      return NextResponse.json({ skipped: true, reason: "cooldown", updatedAt: lastUpdated });
+    }
+  }
+
   try {
     const screenings = await scrapeAll();
     const updatedAt = new Date().toISOString();
