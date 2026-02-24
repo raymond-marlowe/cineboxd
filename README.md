@@ -44,3 +44,4 @@ Push to GitHub and import in [Vercel](https://vercel.com). Set `TMDB_API_KEY` in
 ## Built with
 
 Next.js, React, Tailwind CSS, Cheerio, Fuse.js, TMDB API.
+
