@@ -29,6 +29,17 @@ export const SUPPORTED_VENUES: Venue[] = [
   { name: "JW3",                    url: "https://www.jw3.org.uk/cinema" },
   { name: "Curzon Sea Containers",  url: "https://ticketing.eu.veezi.com/sessions/?siteToken=a4xawmcnn5xz11am1ayy6ykfdm" },
   { name: "Curzon Goldsmiths",      url: "https://ticketing.eu.veezi.com/sessions/?siteToken=pvmm3g2bze4sajxy7qyab2x344" },
+  // Curzon main-site venues (requires ENABLE_CURZON_OCAPI=true)
+  { name: "Curzon Soho",           url: "https://www.curzon.com/venues/soho/" },
+  { name: "Curzon Camden",         url: "https://www.curzon.com/venues/camden/" },
+  { name: "Curzon Mayfair",        url: "https://www.curzon.com/venues/mayfair/" },
+  { name: "Curzon Bloomsbury",     url: "https://www.curzon.com/venues/bloomsbury/" },
+  { name: "Curzon Victoria",       url: "https://www.curzon.com/venues/victoria/" },
+  { name: "Curzon Hoxton",         url: "https://www.curzon.com/venues/hoxton/" },
+  { name: "Curzon Richmond",       url: "https://www.curzon.com/venues/richmond/" },
+  { name: "Curzon Kingston",       url: "https://www.curzon.com/venues/kingston/" },
+  { name: "Curzon Wimbledon",      url: "https://www.curzon.com/venues/wimbledon/" },
+  { name: "Curzon Aldgate",        url: "https://www.curzon.com/venues/aldgate/" },
 ];
 
 const CLAMP = 10;

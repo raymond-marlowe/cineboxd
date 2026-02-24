@@ -1,0 +1,123 @@
+{
+  "businessDate": "2026-02-25",
+  "showtimes": [
+    {
+      "id": "SOH1-54176",
+      "schedule": {
+        "businessDate": "2026-02-25",
+        "startsAt": "2026-02-25T13:00:00+00:00",
+        "endsAt": "2026-02-25T15:41:00+00:00",
+        "filmStartsAt": "2026-02-25T13:25:00+00:00",
+        "filmEndsAt": "2026-02-25T15:41:00+00:00",
+        "inSeatItemDelivery": null
+      },
+      "isSoldOut": false,
+      "seatLayoutId": "SOH1-2-12",
+      "filmId": "HO00006762",
+      "siteId": "SOH1",
+      "screenId": "SOH1-2",
+      "areaCategories": [{ "areaCategoryId": "SOH1-0000000001", "isAllocatedSeating": true }],
+      "attributeIds": [],
+      "isAllocatedSeating": true,
+      "requires3dGlasses": false,
+      "eventId": null,
+      "restrictions": ["FilmAdvanceBookingRule"],
+      "filmAdvanceBookingRuleId": "SOH1-115-HO00006762"
+    },
+    {
+      "id": "CAM1-39498",
+      "schedule": {
+        "businessDate": "2026-02-25",
+        "startsAt": "2026-02-25T19:30:00+00:00",
+        "endsAt": "2026-02-25T22:00:00+00:00",
+        "filmStartsAt": "2026-02-25T19:55:00+00:00",
+        "filmEndsAt": "2026-02-25T22:00:00+00:00",
+        "inSeatItemDelivery": null
+      },
+      "isSoldOut": true,
+      "seatLayoutId": "CAM1-1-5",
+      "filmId": "HO00006765",
+      "siteId": "CAM1",
+      "screenId": "CAM1-1",
+      "areaCategories": [{ "areaCategoryId": "CAM1-0000000001", "isAllocatedSeating": true }],
+      "attributeIds": ["0000000059"],
+      "isAllocatedSeating": true,
+      "requires3dGlasses": false,
+      "eventId": null,
+      "restrictions": [],
+      "filmAdvanceBookingRuleId": null
+    },
+    {
+      "id": "SOH1-54176",
+      "schedule": {
+        "businessDate": "2026-02-25",
+        "startsAt": "2026-02-25T13:00:00+00:00",
+        "endsAt": "2026-02-25T15:41:00+00:00",
+        "filmStartsAt": "2026-02-25T13:25:00+00:00",
+        "filmEndsAt": "2026-02-25T15:41:00+00:00",
+        "inSeatItemDelivery": null
+      },
+      "isSoldOut": false,
+      "seatLayoutId": "SOH1-2-12",
+      "filmId": "HO00006762",
+      "siteId": "SOH1",
+      "screenId": "SOH1-2",
+      "areaCategories": [],
+      "attributeIds": [],
+      "isAllocatedSeating": true,
+      "requires3dGlasses": false,
+      "eventId": null,
+      "restrictions": [],
+      "filmAdvanceBookingRuleId": null
+    }
+  ],
+  "relatedData": {
+    "films": [
+      {
+        "id": "HO00006762",
+        "title": { "text": "\"Wuthering Heights\"", "translations": [] },
+        "synopsis": { "text": "A bold and original imagining of one of the greatest love stories.", "translations": [] },
+        "shortSynopsis": { "text": "Margot Robbie and Jacob Elordi.", "translations": [] },
+        "censorRatingId": "HO00000006",
+        "releaseDate": "2026-02-13",
+        "runtimeInMinutes": 136,
+        "trailerUrl": "https://www.youtube.com/watch?v=i39w-wDZZuU",
+        "displayPriority": 1,
+        "castAndCrew": [],
+        "genreIds": ["0000000002"],
+        "externalIds": { "moviexchangeReleaseId": "3869f393-3342-4dc1-9c0a-a7d04e170132" },
+        "hopk": "HO00006762",
+        "hoCode": "A000008342",
+        "eventId": null,
+        "distributorName": "Warners"
+      },
+      {
+        "id": "HO00006765",
+        "title": { "text": "Novocaine", "translations": [] },
+        "synopsis": { "text": "A mild-mannered man with a rare condition discovers a hidden capacity for violence.", "translations": [] },
+        "shortSynopsis": { "text": "A mild-mannered man discovers violence.", "translations": [] },
+        "censorRatingId": "HO00000004",
+        "releaseDate": "2025-03-14",
+        "runtimeInMinutes": 110,
+        "trailerUrl": null,
+        "displayPriority": 2,
+        "castAndCrew": [],
+        "genreIds": ["0000000001"],
+        "externalIds": { "moviexchangeReleaseId": null },
+        "hopk": "HO00006765",
+        "hoCode": "A000008345",
+        "eventId": null,
+        "distributorName": "Lionsgate"
+      }
+    ],
+    "sites": [],
+    "castAndCrew": [],
+    "genres": [],
+    "censorRatings": [],
+    "attributes": [],
+    "screens": [],
+    "events": [],
+    "filmAdvanceBookingRules": [],
+    "areaCategories": []
+  }
+}

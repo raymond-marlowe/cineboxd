@@ -24,6 +24,17 @@ export const VENUE_COORDS: Record<string, VenueCoords> = {
   "JW3":                   { lat: 51.5554, lng: -0.1788 }, // 341-351 Finchley Road, NW3 6ET
   "Curzon Sea Containers": { lat: 51.5068, lng: -0.1090 }, // Sea Containers House, SE1 9PH
   "Curzon Goldsmiths":     { lat: 51.4743, lng: -0.0353 }, // Lewisham Way, SE14 6NW
+  // Curzon main-site venues (OCAPI scraper)
+  "Curzon Soho":           { lat: 51.5131, lng: -0.1340 }, // 99 Shaftesbury Avenue, W1D 5DY
+  "Curzon Camden":         { lat: 51.5389, lng: -0.1427 }, // Dockray Place, NW1 8QD
+  "Curzon Mayfair":        { lat: 51.5105, lng: -0.1440 }, // 38 Curzon Street, W1J 7TY
+  "Curzon Bloomsbury":     { lat: 51.5226, lng: -0.1231 }, // 1 Brunswick Centre, WC1N 1AF
+  "Curzon Victoria":       { lat: 51.4975, lng: -0.1437 }, // 58 Victoria Street, SW1E 6QP
+  "Curzon Hoxton":         { lat: 51.5281, lng: -0.0800 }, // 2-6 Hoxton Square, N1 6NU
+  "Curzon Richmond":       { lat: 51.4608, lng: -0.3057 }, // Water Lane, TW9 1TJ
+  "Curzon Kingston":       { lat: 51.4101, lng: -0.3021 }, // Omni Centre, KT1 1RS
+  "Curzon Wimbledon":      { lat: 51.4214, lng: -0.2051 }, // The Broadway, SW19 1QG
+  "Curzon Aldgate":        { lat: 51.5141, lng: -0.0771 }, // Aldgate Tower, E1 8FA
 };
 
 /** Haversine distance between two lat/lng points, in miles. */
