@@ -81,6 +81,13 @@ export async function scrapeRegentStreet(): Promise<Screening[]> {
   ];
 
   // Stage 2: slug → { id, name } via findMovieBySlug (20 concurrent)
+  // Event/award suffixes appended by the venue to the API movie name, e.g.:
+  //   "Train Dreams- Celebrating The Oscars®"  → "Train Dreams"
+  //   "Some Film - Q&A with Director"          → "Some Film"
+  //   "Some Film - Captioned Screening"        → "Some Film"
+  const EVENT_SUFFIX_RE =
+    /\s*-+\s*(Q&A|Previews?|Captioned|Audio\s+Descri|Special\b|Gala\b|Celebrating\b|In\s+Honou?r\b)\b.*/i;
+
   type MovieInfo = { id: string; name: string };
   const movieResults = await inChunks(slugs, 20, async (slug) => {
     const json = await gqlQuery(
@@ -88,8 +95,13 @@ export async function scrapeRegentStreet(): Promise<Screening[]> {
     );
     const m = json?.data?.findMovieBySlug;
     if (!m?.id) throw new Error("not found");
-    // The API sometimes wraps the name in literal double-quotes
-    return { id: m.id, name: (m.name as string).replace(/^"|"$/g, "").trim() } as MovieInfo;
+    // The API sometimes wraps the name in literal double-quotes; also strip event suffixes
+    const rawName = (m.name as string).replace(/^"|"$/g, "").trim();
+    const cleanName = rawName.replace(EVENT_SUFFIX_RE, "").trim();
+    if (cleanName !== rawName) {
+      console.log(`[regent-street] stripped suffix: "${rawName}" → "${cleanName}"`);
+    }
+    return { id: m.id, name: cleanName } as MovieInfo;
   });
 
   const movies = movieResults

@@ -22,6 +22,8 @@ export const VENUE_COORDS: Record<string, VenueCoords> = {
   "Regent Street Cinema":  { lat: 51.5081, lng: -0.1349 }, // 49 Regent Street, W1B 4JY
   "Rich Mix":              { lat: 51.5224, lng: -0.0747 }, // 35-47 Bethnal Green Road, E1 6LA
   "JW3":                   { lat: 51.5554, lng: -0.1788 }, // 341-351 Finchley Road, NW3 6ET
+  "Curzon Sea Containers": { lat: 51.5068, lng: -0.1090 }, // Sea Containers House, SE1 9PH
+  "Curzon Goldsmiths":     { lat: 51.4743, lng: -0.0353 }, // Lewisham Way, SE14 6NW
 };
 
 /** Haversine distance between two lat/lng points, in miles. */

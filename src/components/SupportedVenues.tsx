@@ -27,6 +27,8 @@ export const SUPPORTED_VENUES: Venue[] = [
   { name: "Regent Street Cinema",   url: "https://www.regentstreetcinema.com" },
   { name: "Rich Mix",               url: "https://richmix.org.uk/whats-on/cinema/" },
   { name: "JW3",                    url: "https://www.jw3.org.uk/cinema" },
+  { name: "Curzon Sea Containers",  url: "https://ticketing.eu.veezi.com/sessions/?siteToken=a4xawmcnn5xz11am1ayy6ykfdm" },
+  { name: "Curzon Goldsmiths",      url: "https://ticketing.eu.veezi.com/sessions/?siteToken=pvmm3g2bze4sajxy7qyab2x344" },
 ];
 
 const CLAMP = 10;

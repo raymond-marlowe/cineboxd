@@ -19,6 +19,12 @@ function hasSufficientTokenOverlap(a: string, b: string): boolean {
 
   if (tokensA.length === 0 || tokensB.length === 0) return false;
 
+  // Guard: if either title is a single significant token, both must be single-token.
+  // Prevents e.g. "Dreams" fuzzy-matching "Train Dreams" or "Magazine Dreams".
+  if (Math.min(tokensA.length, tokensB.length) === 1 && tokensA.length !== tokensB.length) {
+    return false;
+  }
+
   // Use the shorter list as reference — all its tokens should appear in the longer
   const [shorter, longer] =
     tokensA.length <= tokensB.length ? [tokensA, tokensB] : [tokensB, tokensA];
@@ -33,6 +39,21 @@ export function matchFilms(
   screenings: Screening[]
 ): MatchedScreening[] {
   if (screenings.length === 0 || watchlist.length === 0) return [];
+
+  // Deduplicate watchlist: letterboxdUri is the stable primary key; fall back to
+  // normalised title+year. Prevents duplicate film cards when the same entry
+  // appears more than once (e.g. re-exported CSV, RSS quirk, shared-list merge).
+  const seenFilms = new Set<string>();
+  const uniqueWatchlist: WatchlistFilm[] = [];
+  for (const film of watchlist) {
+    const key = film.letterboxdUri
+      ? film.letterboxdUri
+      : normalizeTitle(film.title) + "|" + (film.year ?? "");
+    if (!seenFilms.has(key)) {
+      seenFilms.add(key);
+      uniqueWatchlist.push(film);
+    }
+  }
 
   // Build index for exact normalized-title matches
   const screeningsByNorm = new Map<string, Screening[]>();
@@ -56,24 +77,42 @@ export function matchFilms(
 
   const matched: MatchedScreening[] = [];
 
-  for (const film of watchlist) {
+  for (const film of uniqueWatchlist) {
     const normTitle = normalizeTitle(film.title);
+    // TEMP DEBUG — remove once Train Dreams matching is confirmed working
+    const _debug = normTitle === "train dreams";
 
     // 1) Try exact match on normalized title first
     let matchedScreenings = screeningsByNorm.get(normTitle) ?? [];
 
+    if (_debug) {
+      console.log(`[matcher:debug] "${film.title}" (year=${film.year}) exact-map hit: ${matchedScreenings.length}`);
+    }
+
     // 2) If no exact match, fall back to fuzzy with strict threshold + token check
     if (matchedScreenings.length === 0) {
-      matchedScreenings = fuse
-        .search(normTitle)
+      const fuzzyHits = fuse.search(normTitle);
+      if (_debug) {
+        console.log(`[matcher:debug] top-5 fuzzy candidates for "${film.title}":`);
+        for (const r of fuzzyHits.slice(0, 5)) {
+          const overlap = hasSufficientTokenOverlap(film.title, r.item.title);
+          console.log(
+            `  score=${r.score?.toFixed(4)} title="${r.item.title}" year=${r.item.year} overlap=${overlap}`
+          );
+        }
+      }
+      matchedScreenings = fuzzyHits
         .filter((r) => hasSufficientTokenOverlap(film.title, r.item.title))
         .map((r) => r.item);
     }
 
     // 3) Filter by year when both sides have one
     matchedScreenings = matchedScreenings.filter((s) => {
-      if (film.year && s.year && film.year !== s.year) return false;
-      return true;
+      const drop = !!(film.year && s.year && film.year !== s.year);
+      if (_debug && drop) {
+        console.log(`[matcher:debug] year-drop "${s.title}" watchlist=${film.year} screening=${s.year}`);
+      }
+      return !drop;
     });
 
     if (matchedScreenings.length > 0) {
