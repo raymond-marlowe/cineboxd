@@ -54,10 +54,11 @@ export function parseVeeziPage(html: string, venueName: string): Screening[] {
   const seen = new Set<string>();
   const screenings: Screening[] = [];
 
-  // Prefer "sort by film" tab; fall back to whole document
+  // Prefer "sort by film" tab; fall back to body ($.root() returns Cheerio<Document>
+  // which causes a type mismatch — $("body") gives Cheerio<Element>)
   const scope = $("#sessionsByFilmConent").length
     ? $("#sessionsByFilmConent")
-    : $.root();
+    : $("body");
 
   scope.find("h3.title").each((_, titleEl) => {
     const rawTitle = $(titleEl).text().trim();
