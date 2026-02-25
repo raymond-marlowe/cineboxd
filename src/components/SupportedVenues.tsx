@@ -29,6 +29,18 @@ export const SUPPORTED_VENUES: Venue[] = [
   { name: "JW3",                    url: "https://www.jw3.org.uk/cinema" },
   { name: "Curzon Sea Containers",  url: "https://ticketing.eu.veezi.com/sessions/?siteToken=a4xawmcnn5xz11am1ayy6ykfdm" },
   { name: "Curzon Goldsmiths",      url: "https://ticketing.eu.veezi.com/sessions/?siteToken=pvmm3g2bze4sajxy7qyab2x344" },
+  // Picturehouse venues (requires ENABLE_PICTUREHOUSE=true)
+  { name: "Clapham Picturehouse",       url: "https://www.picturehouses.com/cinema/clapham-picturehouse" },
+  { name: "Crouch End Picturehouse",    url: "https://www.picturehouses.com/cinema/crouch-end-picturehouse" },
+  { name: "Ealing Picturehouse",        url: "https://www.picturehouses.com/cinema/ealing-picturehouse" },
+  { name: "East Dulwich Picturehouse",  url: "https://www.picturehouses.com/cinema/east-dulwich" },
+  { name: "Finsbury Park Picturehouse", url: "https://www.picturehouses.com/cinema/finsbury-park" },
+  { name: "Greenwich Picturehouse",     url: "https://www.picturehouses.com/cinema/greenwich-picturehouse" },
+  { name: "Hackney Picturehouse",       url: "https://www.picturehouses.com/cinema/hackney-picturehouse" },
+  { name: "Picturehouse Central",       url: "https://www.picturehouses.com/cinema/picturehouse-central" },
+  { name: "Ritzy Picturehouse",         url: "https://www.picturehouses.com/cinema/the-ritzy" },
+  { name: "The Gate Picturehouse",      url: "https://www.picturehouses.com/cinema/the-gate" },
+  { name: "West Norwood Picturehouse",  url: "https://www.picturehouses.com/cinema/west-norwood-picturehouse" },
   // Curzon main-site venues (requires ENABLE_CURZON_OCAPI=true)
   { name: "Curzon Soho",           url: "https://www.curzon.com/venues/soho/" },
   { name: "Curzon Camden",         url: "https://www.curzon.com/venues/camden/" },

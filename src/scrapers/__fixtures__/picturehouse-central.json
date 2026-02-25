@@ -1,0 +1,130 @@
+{
+  "response": "success",
+  "movies": [
+    {
+      "ID": "022-HO00017649",
+      "ScheduledFilmId": "HO00017649",
+      "Title": "ALL YOU NEED IS KILL",
+      "CinemaId": "022",
+      "TrailerUrl": "https://www.youtube.com/watch?v=0YpXN40vIxM",
+      "show_times": [
+        {
+          "CinemaId": "022",
+          "ScheduledFilmId": "HO00017649",
+          "Showtime": "2026-02-27T20:30:00",
+          "EventId": "0000000094",
+          "SessionId": "115556",
+          "SessionAttributesNames": ["Sub Cinema", "2D"],
+          "ScreenName": "Screen 6",
+          "SoldoutStatus": 0,
+          "GlobalEventId": "0000000103",
+          "time_format": "08:30 PM",
+          "time": "20:30",
+          "date": "Fri 27 Feb, 2026",
+          "date_f": "2026-02-27",
+          "show_time": 1772224200,
+          "attributes": []
+        },
+        {
+          "CinemaId": "022",
+          "ScheduledFilmId": "HO00017649",
+          "Showtime": "2026-02-27T20:30:00",
+          "EventId": "0000000094",
+          "SessionId": "115556",
+          "SessionAttributesNames": ["Sub Cinema", "2D"],
+          "ScreenName": "Screen 6",
+          "SoldoutStatus": 0,
+          "GlobalEventId": "0000000103",
+          "time_format": "08:30 PM",
+          "time": "20:30",
+          "date": "Fri 27 Feb, 2026",
+          "date_f": "2026-02-27",
+          "show_time": 1772224200,
+          "attributes": []
+        }
+      ],
+      "available_cinemas": ["022"]
+    },
+    {
+      "ID": "022-HO00017482",
+      "ScheduledFilmId": "HO00017482",
+      "Title": "Aurora: What Happened To The Earth?",
+      "CinemaId": "022",
+      "TrailerUrl": "",
+      "show_times": [
+        {
+          "CinemaId": "022",
+          "ScheduledFilmId": "HO00017482",
+          "Showtime": "2026-03-04T20:10:00",
+          "EventId": "",
+          "SessionId": "114646",
+          "SessionAttributesNames": ["2D", "Screen Art"],
+          "ScreenName": "Screen 3",
+          "SoldoutStatus": 0,
+          "GlobalEventId": "",
+          "time_format": "08:10 PM",
+          "time": "20:10",
+          "date": "Wed 04 Mar, 2026",
+          "date_f": "2026-03-04",
+          "show_time": 1772655000,
+          "attributes": []
+        }
+      ],
+      "available_cinemas": ["022"]
+    },
+    {
+      "ID": "022-HO99999",
+      "ScheduledFilmId": "HO99999",
+      "Title": "  ",
+      "CinemaId": "022",
+      "TrailerUrl": "",
+      "show_times": [
+        {
+          "CinemaId": "022",
+          "ScheduledFilmId": "HO99999",
+          "SessionId": "999001",
+          "time": "18:00",
+          "date_f": "2026-03-01",
+          "SoldoutStatus": 0
+        }
+      ],
+      "available_cinemas": ["022"]
+    },
+    {
+      "ID": "022-HO99998",
+      "ScheduledFilmId": "HO99998",
+      "Title": "Bad Date Film",
+      "CinemaId": "022",
+      "TrailerUrl": "",
+      "show_times": [
+        {
+          "CinemaId": "022",
+          "ScheduledFilmId": "HO99998",
+          "SessionId": "999002",
+          "time": "18:00",
+          "date_f": "not-a-date",
+          "SoldoutStatus": 0
+        }
+      ],
+      "available_cinemas": ["022"]
+    },
+    {
+      "ID": "022-HO99997",
+      "ScheduledFilmId": "HO99997",
+      "Title": "No Session Film",
+      "CinemaId": "022",
+      "TrailerUrl": "",
+      "show_times": [
+        {
+          "CinemaId": "022",
+          "ScheduledFilmId": "HO99997",
+          "SessionId": "",
+          "time": "18:00",
+          "date_f": "2026-03-01",
+          "SoldoutStatus": 0
+        }
+      ],
+      "available_cinemas": ["022"]
+    }
+  ]
+}

@@ -15,6 +15,7 @@ import { scrapeRichMix } from "./rich-mix";
 import { scrapeJW3 } from "./jw3";
 import { scrapeCurzonVeezi } from "./curzon-veezi";
 import { scrapeCurzonOcapi } from "./curzon-ocapi";
+import { scrapePicturehouse } from "./picturehouse";
 
 // TODO: Picturehouse scraper disabled — API data did not reliably match website listings.
 // See picturehouse.ts for details on re-enabling.
@@ -48,6 +49,7 @@ const namedScrapers: { name: string; fn: Scraper }[] = [
   { name: "jw3",                 fn: scrapeJW3 },
   { name: "curzon-veezi",        fn: scrapeCurzonVeezi },
   { name: "curzon-ocapi",        fn: scrapeCurzonOcapi },
+  { name: "picturehouse",        fn: scrapePicturehouse },
 ];
 
 // Keep the flat array for any callers that still use it.

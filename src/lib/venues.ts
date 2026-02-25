@@ -24,6 +24,18 @@ export const VENUE_COORDS: Record<string, VenueCoords> = {
   "JW3":                   { lat: 51.5554, lng: -0.1788 }, // 341-351 Finchley Road, NW3 6ET
   "Curzon Sea Containers": { lat: 51.5068, lng: -0.1090 }, // Sea Containers House, SE1 9PH
   "Curzon Goldsmiths":     { lat: 51.4743, lng: -0.0353 }, // Lewisham Way, SE14 6NW
+  // Picturehouse venues (ENABLE_PICTUREHOUSE scraper)
+  "Clapham Picturehouse":       { lat: 51.4609, lng: -0.1417 }, // 76 Venn St, SW4 0AT
+  "Crouch End Picturehouse":    { lat: 51.5762, lng: -0.1202 }, // 5-7 Topsfield Parade, N8 8PR
+  "Ealing Picturehouse":        { lat: 51.5130, lng: -0.3048 }, // 197 New Broadway, W5 2XA
+  "East Dulwich Picturehouse":  { lat: 51.4563, lng: -0.0640 }, // 66 Grove Vale, SE22 8DT
+  "Finsbury Park Picturehouse": { lat: 51.5647, lng: -0.1071 }, // 8-12 Stroud Green Rd, N4 2DF
+  "Greenwich Picturehouse":     { lat: 51.4773, lng: -0.0097 }, // 180 Greenwich High Rd, SE10 8NN
+  "Hackney Picturehouse":       { lat: 51.5413, lng: -0.0556 }, // 270 Mare Street, E8 1HE
+  "Picturehouse Central":       { lat: 51.5118, lng: -0.1337 }, // 9-12 Shaftesbury Avenue, W1D 7EZ
+  "Ritzy Picturehouse":         { lat: 51.4630, lng: -0.1142 }, // Coldharbour Lane, Brixton, SW2 1JG
+  "The Gate Picturehouse":      { lat: 51.5074, lng: -0.1968 }, // 87 Notting Hill Gate, W11 3JZ
+  "West Norwood Picturehouse":  { lat: 51.4269, lng: -0.1068 }, // 95 Knights Hill, SE27 0LR
   // Curzon main-site venues (OCAPI scraper)
   "Curzon Soho":           { lat: 51.5131, lng: -0.1340 }, // 99 Shaftesbury Avenue, W1D 5DY
   "Curzon Camden":         { lat: 51.5389, lng: -0.1427 }, // Dockray Place, NW1 8QD
