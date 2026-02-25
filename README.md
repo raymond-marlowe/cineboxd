@@ -2,7 +2,7 @@
 
 Find your Letterboxd watchlist films screening at London's independent cinemas.
 
-Enter your Letterboxd username (or upload a CSV export) and see which films on your watchlist are currently showing at 14 London independent cinemas — with posters, ratings, booking links, calendar export, and a map view.
+Enter your Letterboxd username (or upload a CSV export) and see which films on your watchlist are currently showing at London's independent cinemas — with posters, ratings, booking links, calendar export, and a map view.
 
 <!-- ![Screenshot](screenshot.png) -->
 
@@ -51,6 +51,9 @@ Push to GitHub and import in [Vercel](https://vercel.com). Set environment varia
 | `KV_REST_API_URL` | Recommended | Upstash Redis REST URL |
 | `KV_REST_API_TOKEN` | Recommended | Upstash Redis REST token |
 | `REFRESH_SECRET` | Yes (for cron) | Bearer token for `POST /api/refresh-screenings` |
+| `ENABLE_CURZON_OCAPI` | Optional | Set to `true` to enable Curzon main-site venues (Soho, Camden, Mayfair, etc.) |
+| `ENABLE_PICTUREHOUSE` | Optional | Set to `true` to enable Picturehouse venues (Central, Hackney, Ritzy, Gate, etc.) |
+| `ENABLE_EVERYMAN` | Optional | Set to `true` to enable Everyman venues (Hampstead, Borough Yards, King's Cross, etc.) |
 
 Set up a daily cron job to call `POST /api/refresh-screenings` with `Authorization: Bearer <REFRESH_SECRET>` to keep screenings fresh.
 

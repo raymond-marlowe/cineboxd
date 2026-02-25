@@ -56,8 +56,8 @@ cineboxd/
 │   │   ├── subscriptions.ts          # JSON-file subscription store (read/write/add/remove)
 │   │   └── venues.ts                 # Hardcoded venue coordinates + Haversine distance utilities
 │   │
-│   └── scrapers/                     # Cinema listing scrapers (14 active)
-│       ├── index.ts                  # Runs all scrapers in parallel, collects results
+│   └── scrapers/                     # Cinema listing scrapers (18 active, 3 flag-gated)
+│       ├── index.ts                  # Runs all scrapers in parallel, returns per-scraper breakdown
 │       ├── prince-charles.ts         # Prince Charles Cinema (HTML)
 │       ├── close-up.ts               # Close-Up Film Centre (HTML)
 │       ├── ica.ts                    # ICA Cinema (HTML)
@@ -72,7 +72,10 @@ cineboxd/
 │       ├── regent-street.ts          # Regent Street Cinema (GraphQL — Indy Systems)
 │       ├── rich-mix.ts               # Rich Mix (two-pass HTML — Spektrix)
 │       ├── jw3.ts                    # JW3 (Spektrix REST API)
-│       └── picturehouse.ts           # Picturehouse Cinemas (DISABLED — API unreliable)
+│       ├── curzon-veezi.ts           # Curzon Sea Containers + Goldsmiths (Veezi HTML)
+│       ├── curzon-ocapi.ts           # 10 Curzon main-site venues (Vista OCAPI — ENABLE_CURZON_OCAPI)
+│       ├── picturehouse.ts           # 11 Picturehouse London venues (JSON API — ENABLE_PICTUREHOUSE)
+│       └── everyman.ts               # 16 Everyman London venues (Boxoffice JSON API — ENABLE_EVERYMAN)
 │
 ├── .env.local                        # Environment variables (TMDB_API_KEY, KV_*, REFRESH_SECRET)
 ├── next.config.ts                    # Next.js configuration
@@ -109,7 +112,7 @@ Content-Type: application/json
         ├──────── Read screenings (redis.ts) ──────────── Redis GET screenings:v1
         │         If cache hit → use cached Screening[]    (populated by /api/refresh-screenings)
         │         If cache miss → live scrape (fallback):
-        │           All 14 scrapers run in parallel
+        │           All scrapers run in parallel
         │           Failed scrapers are silently skipped
         │           Results written to Redis (24h TTL)
         │         → Screening[]
@@ -217,7 +220,7 @@ JSON response ──────────────────────
 | Watchlist from username | `letterboxd-rss.ts` |
 | Watchlist from CSV | `csv-parser.ts` |
 | Screenings cache read | `redis.ts`, `api/match/route.ts` |
-| Cinema scraping (fallback / cron) | `scrapers/index.ts`, `prince-charles.ts`, `close-up.ts`, `ica.ts`, `barbican.ts`, `rio.ts`, `genesis.ts`, `arthouse-crouch-end.ts`, `act-one.ts`, `phoenix.ts`, `lexi.ts`, `garden.ts`, `regent-street.ts`, `rich-mix.ts`, `jw3.ts` |
+| Cinema scraping (fallback / cron) | `scrapers/index.ts`, `prince-charles.ts`, `close-up.ts`, `ica.ts`, `barbican.ts`, `rio.ts`, `genesis.ts`, `arthouse-crouch-end.ts`, `act-one.ts`, `phoenix.ts`, `lexi.ts`, `garden.ts`, `regent-street.ts`, `rich-mix.ts`, `jw3.ts`, `curzon-veezi.ts`, `curzon-ocapi.ts`, `picturehouse.ts`, `everyman.ts` |
 | Film matching | `matcher.ts`, `csv-parser.ts` (for `normalizeTitle`) |
 | TMDB enrichment | `tmdb.ts`, `cache.ts` |
 | Results display | `page.tsx`, `calendar.tsx` |
@@ -406,13 +409,50 @@ JSON response ──────────────────────
 - **Returns:** Title, year (from trailing `(YYYY)` in title), date, time, venue, booking URL, format
 - **Reliability:** High — semantic CSS classes and data attributes are stable.
 
-### Picturehouse Cinemas — DISABLED
+### Curzon Sea Containers + Goldsmiths (Veezi) — ENABLED
 
-- **Planned API:** `POST https://www.picturehouses.com/api/scheduled-movies-ajax`
-- **Body:** `cinema_id=010` (Hackney), `022` (Central), `016` (Gate), etc.
+- **URLs:** `https://ticketing.eu.veezi.com/sessions/?siteToken=<token>`
+- **Venues:** Curzon Sea Containers (`a4xawmcnn5xz11am1ayy6ykfdm`), Curzon Goldsmiths (`pvmm3g2bze4sajxy7qyab2x344`)
+- **Method:** HTML scraping with Cheerio (Veezi is server-rendered — no JS required)
+- **Key selector:** `#sessionsByFilmConent` (note Veezi typo "Conent") — the "sort by film" tab; falls back to `$.root()` if absent
+- **Structure:** `h3.title` → film title; `div.date-container h4.date` → date ("Friday 27, February"); `ul.session-times li a[href] time` → booking link + time
+- **Date parsing:** "Friday 27, February" → `parseVeeziDate` → `YYYY-MM-DD` with year rollover logic
+- **Time parsing:** "6:15 PM" → `parseVeeziTime` → `HH:mm` 24-hour
+- **Booking URLs:** Absolute Veezi purchase URLs from `a[href]`; list items without `<a href>` are sold out and skipped
+- **Caching:** In-process (6h TTL); skips `setCache` on empty result to avoid poisoning the cache
+- **Returns:** Title (year stripped from trailing `(YYYY)` if present), year, date, time, venue, booking URL, format (from title prefix like "Q&A:", "Preview:")
+- **Reliability:** High — Veezi is server-rendered; HTML structure is stable.
+
+### Curzon OCAPI (10 London main-site venues) — ENABLED (`ENABLE_CURZON_OCAPI=true`)
+
+- **Feature flag:** `ENABLE_CURZON_OCAPI=true` (returns `[]` if unset)
+- **Venue override:** `CURZON_SITE_IDS=SOH1,CAM1,...` overrides the default active set
+- **API:** `GET https://vwc.curzon.com/WSVistaWebClient/ocapi/v1/showtimes/by-business-date/{date}?siteIds=SOH1&siteIds=CAM1&...`
+- **Auth:** Anonymous JWT embedded in every Curzon HTML page as `"authToken":"<JWT>"` (~12h TTL); extracted from `https://www.curzon.com/venues/soho/` (falls back to `/venues/camden/`); cached in-process for 1 hour
+- **Venues:** SOH1 (Soho), CAM1 (Camden), MAY1 (Mayfair), BLO1 (Bloomsbury), VIC1 (Victoria), HOX1 (Hoxton), RIC1 (Richmond), KIN1 (Kingston), WIM01 (Wimbledon — note WIM01 not WIM1), ALD1 (Aldgate)
+- **Batching:** All active siteIds are sent in a single request per date (7 dates × 1 request = 7 total). **Note:** one invalid siteId causes the entire batch to return HTTP 400, so all siteIds must be valid.
+- **Date window:** 7 days from today (Europe/London timezone); dates fetched 3 at a time concurrently
+- **Booking URL:** `https://www.curzon.com/ticketing/seats/{SessionId}/`
+- **Title cleaning:** Strips wrapping literal double-quotes (e.g. `"\"Wuthering Heights\""` → `"Wuthering Heights"`)
+- **Returns:** Title, year (from `releaseDate` field), date, time (London local), venue, booking URL, format (null)
+- **Reliability:** High — structured JSON API; no DOM parsing needed.
+
+### Picturehouse Cinemas (11 London venues) — ENABLED (`ENABLE_PICTUREHOUSE=true`)
+
+- **Feature flag:** `ENABLE_PICTUREHOUSE=true` (returns `[]` if unset)
+- **API:** `POST https://www.picturehouses.com/api/scheduled-movies-ajax`
+- **Body:** `cinema_id=NNN` (one request per venue)
 - **Headers:** `Content-Type: application/x-www-form-urlencoded`, `X-Requested-With: XMLHttpRequest`
-- **Status:** Disabled because API data did not match actual website listings, and booking URLs were invalid.
-- **To re-enable:** Verify API matches website, fix booking URL format, add back to `scrapers/index.ts`.
+- **Response:** `{ response: "success", movies: [{ Title, show_times: [{ CinemaId, SessionId, time, date_f, ... }] }] }`
+- **Venues:** Central (022), Hackney (010), Gate (016), Ritzy (004), Clapham (020), Crouch End (024), Ealing (031), East Dulwich (009), Finsbury Park (029), Greenwich (021), West Norwood (023)
+- **Cinema ID lookup:** Open `https://www.picturehouses.com/cinema/<slug>`, view source, search for `CINEMA_ID = '`
+- **Booking URL:** `https://web.picturehouses.com/order/showtimes/{CinemaId}-{SessionId}/seats` (confirmed from page JS)
+- **Data fields used:** `date_f` (ISO `YYYY-MM-DD`), `time` (24h `HH:mm`), `SessionId` (booking key)
+- **Validation:** Skips any showtime with empty title, invalid `date_f`, invalid `time`, or missing `SessionId`
+- **Deduplication:** Cross-venue dedup by booking URL (SessionIds are globally unique in Vista)
+- **Caching:** In-process (6h TTL); skips `setCache` on empty result
+- **Returns:** Title, year (null — not in API response), date, time, venue, booking URL, format (null)
+- **Reliability:** High — structured JSON API; no HTML parsing needed.
 
 ### Regent Street Cinema — ENABLED
 
@@ -457,9 +497,25 @@ JSON response ──────────────────────
 - **Returns:** Title, year, date, time, venue, booking URL, format
 - **Reliability:** High — structured JSON API is stable; slug-based booking URLs are best-effort but accurate for most events.
 
-### Everyman Cinema — NOT IMPLEMENTED
+### Everyman Cinema (16 London venues) — ENABLED (`ENABLE_EVERYMAN=true`)
 
-- **Reason:** The site uses Gatsby with client-side rendering. Showtimes are loaded via internal APIs that would need reverse-engineering. Not scrapable with simple `fetch` + Cheerio.
+- **Feature flag:** `ENABLE_EVERYMAN=true` (returns `[]` if unset)
+- **Platform:** Gatsby 5 static site (Netlify) backed by the Webedia/Boxoffice platform. All showtime data is served via Netlify serverless function proxies — no auth required.
+- **Schedule API:** `GET https://www.everymancinema.com/api/gatsby-source-boxofficeapi/schedule`
+  - Params: `theaters={"id":"G011I","timeZone":"Europe/London"}` (repeated for each venue), `from` / `to` as ISO datetimes without tz suffix (`2026-02-25T00:00:00`) representing local London time
+  - Response: `{ [theaterId]: { schedule: { [movieId]: { [date]: EwShowtime[] } } } }`
+  - Each showtime has `startsAt` (ISO local, no tz), `isExpired`, `tags[]`, and `data.ticketing[].urls[]`
+- **Movies API:** `GET https://www.everymancinema.com/api/gatsby-source-boxofficeapi/movies?ids=X&ids=Y` → `[{ id, title }]`
+- **Batching strategy:** 16 venues → 4 batches of 4 (concurrent `Promise.allSettled`); single follow-up movies call for all discovered movie IDs
+- **Date window:** 14 days from today (UTC midnight to midnight, close enough for London local)
+- **Theater ID lookup:** IDs confirmed from each venue page at `https://www.everymancinema.com/{slug}` — appear in `/venues-list/{id}-everyman-{slug}/` URL paths
+- **Venues:** Baker Street (X0712), Barnet (X06SI), Belsize Park (X077P), Borough Yards (G011I), Brentford (G049A), Broadgate (X11NT), Canary Wharf (X0VPB), Chelsea (X078X), Crystal Palace (X11DR), Hampstead (X06ZW), King's Cross (X0X5P), Maida Vale (X0LWI), Muswell Hill (X06SN), Screen on the Green (X077O), Stratford International (G029X), The Whiteley (G05D7)
+- **Booking URL:** `data.ticketing` array entry where `provider === "default"`, first URL — e.g. `https://purchase.everymancinema.com/launch/ticketing/{UUID}`
+- **Format:** Extracted from `tags[]` in priority order: 35mm > Q&A (`QandAEvent`) > Preview > Dolby Atmos > Silver Screen > Baby Club > Subtitled > null
+- **Deduplication:** By booking URL; falls back to composite key `venue|date|time|title` if no booking URL
+- **Caching:** In-process (6h TTL); skips `setCache` on empty result
+- **Returns:** Title, year (null — not in schedule API response), date, time, venue, booking URL, format
+- **Reliability:** High — structured JSON API, no HTML parsing, no auth tokens to refresh.
 
 ## 6. Matching Logic
 
@@ -500,7 +556,7 @@ Film matching happens in `src/lib/matcher.ts` and uses a three-stage pipeline:
 - **Storage:** Upstash Redis (persistent, shared across all serverless instances)
 - **TTL:** 24 hours (`ex: 86400`)
 - **Keys:** `screenings:v1` (the `Screening[]` array), `screenings:updated_at` (ISO timestamp)
-- **What's cached:** The full merged `Screening[]` result from all 14 scrapers
+- **What's cached:** The full merged `Screening[]` result from all active scrapers
 - **Populated by:** `POST /api/refresh-screenings` (intended to be called by a daily cron job)
 - **Read by:** `GET /api/match` — if the key exists, the live scrape is skipped entirely
 - **Fallback:** If `screenings:v1` is missing (first deploy, cache expired), `/api/match` falls back to a live scrape and writes the result back to Redis
@@ -536,6 +592,11 @@ Film matching happens in `src/lib/matcher.ts` and uses a three-stage pipeline:
 | `KV_REST_API_URL` | Recommended | Upstash Redis REST endpoint URL. Without it, every `/api/match` request triggers a live scrape (~10s). | Create a free database at [upstash.com](https://upstash.com), then copy the REST URL from the database dashboard. |
 | `KV_REST_API_TOKEN` | Recommended | Upstash Redis REST token (paired with `KV_REST_API_URL`). | Same Upstash dashboard as above. |
 | `REFRESH_SECRET` | Yes (for cron) | Bearer token required to call `POST /api/refresh-screenings`. Prevents unauthorized cache refreshes. | Generate any random string (e.g. `openssl rand -hex 32`). |
+
+| `ENABLE_CURZON_OCAPI` | Optional | Set to `true` to enable the Curzon OCAPI scraper (10 London main-site venues: Soho, Camden, Mayfair, Bloomsbury, Victoria, Hoxton, Richmond, Kingston, Wimbledon, Aldgate). Returns `[]` if unset. |
+| `CURZON_SITE_IDS` | Optional | Comma-separated list of Vista siteIds to override the Curzon OCAPI default (e.g. `SOH1,CAM1`). Useful for disabling specific venues without changing code. |
+| `ENABLE_PICTUREHOUSE` | Optional | Set to `true` to enable the Picturehouse scraper (11 London venues). Returns `[]` if unset. |
+| `ENABLE_EVERYMAN` | Optional | Set to `true` to enable the Everyman scraper (16 London venues). Returns `[]` if unset. |
 
 All scraper URLs are hardcoded. The `RESEND_*` and `NOTIFY_SECRET` variables for the email subscription feature are documented separately in the Weekly Email Subscription section.
 
@@ -635,13 +696,17 @@ npm run dev
 | Rich Mix | Active | High | Standard two-pass HTML (Spektrix) |
 | JW3 | Active | High | Public Spektrix REST API |
 | Genesis Cinema | Active | High | Stable panel IDs (Admit-One CMS) |
+| Curzon Sea Containers | Active | High | Veezi server-rendered HTML |
+| Curzon Goldsmiths | Active | High | Veezi server-rendered HTML |
+| Curzon Soho/Camden/Mayfair/Bloomsbury/Victoria/Hoxton/Richmond/Kingston/Wimbledon/Aldgate | Active (flag) | High | Vista OCAPI JSON — requires `ENABLE_CURZON_OCAPI=true` |
+| Picturehouse (11 venues) | Active (flag) | High | Structured JSON API — requires `ENABLE_PICTUREHOUSE=true` |
+| Everyman (16 venues) | Active (flag) | High | Boxoffice/Webedia JSON API — requires `ENABLE_EVERYMAN=true` |
 | Close-Up Film Centre | Active | Medium | Fragile CSS selectors, no year data |
 | ICA Cinema | Active | Medium | Date-finding heuristic walks siblings backwards |
 | Arthouse Crouch End | Active | Medium | WordPress/Elementor — class names may change |
 | Phoenix Cinema | Active | Medium | Two-stage Savoy Systems scrape |
 | Regent Street Cinema | Active | Medium-high | GraphQL (Indy Systems) — two round-trips per film |
 | ActOne Cinema | Active | Medium | Pre-rendered HTML only (Indy Systems SPA) — today only |
-| Picturehouse Cinemas | Disabled | — | API data didn't match website |
 | Everyman Cinema | Not built | — | Client-side rendered, not scrapable |
 
 ### Known limitations
