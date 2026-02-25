@@ -1,11 +1,12 @@
 import { Screening } from "@/lib/types";
-import { getCached, setCache } from "@/lib/cache";
 
-const CACHE_KEY = "curzon-ocapi";
 const OCAPI_BASE = "https://vwc.curzon.com/WSVistaWebClient/ocapi/v1";
 const BOOKING_BASE = "https://www.curzon.com/ticketing/seats/";
-// Any Curzon venue page works for token extraction; Soho is the primary.
-const TOKEN_SOURCE_URL = "https://www.curzon.com/venues/soho/";
+// Two pages tried in order for token extraction; any Curzon venue page works.
+const TOKEN_SOURCE_URLS = [
+  "https://www.curzon.com/venues/soho/",
+  "https://www.curzon.com/venues/camden/",
+];
 const DATE_WINDOW_DAYS = 7;
 
 /**
@@ -41,19 +42,35 @@ const DEFAULT_SITE_IDS = ["SOH1", "CAM1"];
 
 // ------- Auth token cache -----------------------------------------------
 // The Curzon site embeds an anonymous RSA-signed JWT (~12h TTL) in every
-// page's HTML. We extract it once per scraper run and cache it for 1 hour.
+// page's HTML under window.initialData.api.authToken.
+// We cache the extracted token in-process for 1 hour (well within the TTL).
 let _tokenCache: { value: string; expiresAt: number } | null = null;
+
+async function tryExtractToken(url: string): Promise<string | null> {
+  try {
+    const html = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(6000),
+    }).then((r) => r.text());
+    const match = html.match(/"authToken":"([^"]+)"/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
 
 async function fetchToken(): Promise<string> {
   if (_tokenCache && Date.now() < _tokenCache.expiresAt) return _tokenCache.value;
-  const html = await fetch(TOKEN_SOURCE_URL, {
-    headers: { "User-Agent": "Mozilla/5.0" },
-    signal: AbortSignal.timeout(6000),
-  }).then((r) => r.text());
-  const match = html.match(/"authToken":"([^"]+)"/);
-  if (!match) throw new Error("curzon-ocapi: auth token not found in page HTML");
-  _tokenCache = { value: match[1], expiresAt: Date.now() + 60 * 60 * 1000 };
-  return _tokenCache.value;
+  for (const url of TOKEN_SOURCE_URLS) {
+    const token = await tryExtractToken(url);
+    if (token) {
+      console.log(`[curzon-ocapi] token extracted OK (source: ${url})`);
+      _tokenCache = { value: token, expiresAt: Date.now() + 60 * 60 * 1000 };
+      return token;
+    }
+    console.warn(`[curzon-ocapi] token not found at ${url}, trying fallback`);
+  }
+  throw new Error("curzon-ocapi: auth token not found in any source page");
 }
 
 // ------- Date helpers ---------------------------------------------------
@@ -181,9 +198,6 @@ export async function scrapeCurzonOcapi(): Promise<Screening[]> {
   // Feature flag: set ENABLE_CURZON_OCAPI=true in env to activate.
   if (process.env.ENABLE_CURZON_OCAPI !== "true") return [];
 
-  const cached = getCached<Screening[]>(CACHE_KEY);
-  if (cached) return cached;
-
   const start = Date.now();
 
   // Resolve active venue set. CURZON_SITE_IDS overrides the default Phase-1 list.
@@ -235,8 +249,7 @@ export async function scrapeCurzonOcapi(): Promise<Screening[]> {
   }
 
   console.log(
-    `[curzon-ocapi] total: ${allScreenings.length} from ${siteIds.length} venues in ${Date.now() - start}ms`
+    `[curzon-ocapi] total: ${allScreenings.length} screenings from ${siteIds.length} venues in ${Date.now() - start}ms`
   );
-  setCache(CACHE_KEY, allScreenings);
   return allScreenings;
 }
