@@ -16,13 +16,7 @@ import { scrapeJW3 } from "./jw3";
 import { scrapeCurzonVeezi } from "./curzon-veezi";
 import { scrapeCurzonOcapi } from "./curzon-ocapi";
 import { scrapePicturehouse } from "./picturehouse";
-
-// TODO: Picturehouse scraper disabled — API data did not reliably match website listings.
-// See picturehouse.ts for details on re-enabling.
-
-// TODO: Everyman Cinema — no scraper implemented. The site (everymancinema.com) uses Gatsby
-// with client-side rendering; showtimes are loaded via internal APIs that would need
-// reverse-engineering. Not reliably scrapable with simple HTML fetching.
+import { scrapeEveryman } from "./everyman";
 
 export type Scraper = () => Promise<Screening[]>;
 
@@ -50,6 +44,7 @@ const namedScrapers: { name: string; fn: Scraper }[] = [
   { name: "curzon-veezi",        fn: scrapeCurzonVeezi },
   { name: "curzon-ocapi",        fn: scrapeCurzonOcapi },
   { name: "picturehouse",        fn: scrapePicturehouse },
+  { name: "everyman",            fn: scrapeEveryman },
 ];
 
 // Keep the flat array for any callers that still use it.

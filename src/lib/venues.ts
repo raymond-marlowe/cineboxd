@@ -47,6 +47,23 @@ export const VENUE_COORDS: Record<string, VenueCoords> = {
   "Curzon Kingston":       { lat: 51.4101, lng: -0.3021 }, // Omni Centre, KT1 1RS
   "Curzon Wimbledon":      { lat: 51.4214, lng: -0.2051 }, // The Broadway, SW19 1QG
   "Curzon Aldgate":        { lat: 51.5141, lng: -0.0771 }, // Aldgate Tower, E1 8FA
+  // Everyman venues (ENABLE_EVERYMAN scraper)
+  "Everyman Baker Street":          { lat: 51.5225, lng: -0.1573 }, // 96-98 Baker St, W1U 6TJ
+  "Everyman Barnet":                { lat: 51.6479, lng: -0.2063 }, // The Spires, High St, EN5 5XY
+  "Everyman Belsize Park":          { lat: 51.5541, lng: -0.1637 }, // 203 Haverstock Hill, NW3 4QG
+  "Everyman Borough Yards":         { lat: 51.5054, lng: -0.0977 }, // Borough Yards, SE1 9PA
+  "Everyman Brentford":             { lat: 51.4890, lng: -0.2869 }, // Brentford, TW8
+  "Everyman Broadgate":             { lat: 51.5197, lng: -0.0857 }, // 2 Finsbury Ave, EC2M 2PP
+  "Everyman Canary Wharf":          { lat: 51.5050, lng: -0.0181 }, // South Colonnade, E14 5AA
+  "Everyman Chelsea":               { lat: 51.4850, lng: -0.1691 }, // 279 King's Road, SW3 5EW
+  "Everyman Crystal Palace":        { lat: 51.4156, lng: -0.0763 }, // Westow St, SE19 3AF
+  "Everyman Hampstead":             { lat: 51.5574, lng: -0.1744 }, // 5 Hollybush Vale, NW3 6TX
+  "Everyman King's Cross":          { lat: 51.5376, lng: -0.1244 }, // 10 Stable St, N1C 4DQ
+  "Everyman Maida Vale":            { lat: 51.5245, lng: -0.1858 }, // 22 Delaware Rd, W9 2LA
+  "Everyman Muswell Hill":          { lat: 51.5893, lng: -0.1445 }, // Muswell Hill Broadway, N10
+  "Everyman Screen on the Green":   { lat: 51.5361, lng: -0.1025 }, // 83 Upper St, N1 0NP
+  "Everyman Stratford International": { lat: 51.5430, lng: -0.0012 }, // 1 Theatre Square, E15 1BX
+  "Everyman The Whiteley":          { lat: 51.5120, lng: -0.1883 }, // 151 Queensway, W2 4SB
 };
 
 /** Haversine distance between two lat/lng points, in miles. */

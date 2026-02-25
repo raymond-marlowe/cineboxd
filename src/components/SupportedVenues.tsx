@@ -52,6 +52,23 @@ export const SUPPORTED_VENUES: Venue[] = [
   { name: "Curzon Kingston",       url: "https://www.curzon.com/venues/kingston/" },
   { name: "Curzon Wimbledon",      url: "https://www.curzon.com/venues/wimbledon/" },
   { name: "Curzon Aldgate",        url: "https://www.curzon.com/venues/aldgate/" },
+  // Everyman venues (requires ENABLE_EVERYMAN=true)
+  { name: "Everyman Baker Street",            url: "https://www.everymancinema.com/baker-street" },
+  { name: "Everyman Barnet",                  url: "https://www.everymancinema.com/barnet" },
+  { name: "Everyman Belsize Park",            url: "https://www.everymancinema.com/belsize-park" },
+  { name: "Everyman Borough Yards",           url: "https://www.everymancinema.com/borough-yards" },
+  { name: "Everyman Brentford",               url: "https://www.everymancinema.com/brentford" },
+  { name: "Everyman Broadgate",               url: "https://www.everymancinema.com/broadgate" },
+  { name: "Everyman Canary Wharf",            url: "https://www.everymancinema.com/canary-wharf" },
+  { name: "Everyman Chelsea",                 url: "https://www.everymancinema.com/chelsea" },
+  { name: "Everyman Crystal Palace",          url: "https://www.everymancinema.com/crystal-palace" },
+  { name: "Everyman Hampstead",               url: "https://www.everymancinema.com/hampstead" },
+  { name: "Everyman King's Cross",            url: "https://www.everymancinema.com/kings-cross" },
+  { name: "Everyman Maida Vale",              url: "https://www.everymancinema.com/maida-vale" },
+  { name: "Everyman Muswell Hill",            url: "https://www.everymancinema.com/muswell-hill" },
+  { name: "Everyman Screen on the Green",     url: "https://www.everymancinema.com/screen-on-the-green" },
+  { name: "Everyman Stratford International", url: "https://www.everymancinema.com/stratford-international" },
+  { name: "Everyman The Whiteley",            url: "https://www.everymancinema.com/the-whiteley" },
 ];
 
 const CLAMP = 10;
