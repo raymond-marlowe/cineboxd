@@ -25,3 +25,8 @@ export function setCache<T>(key: string, data: T): void {
 export function setCacheWithTTL<T>(key: string, data: T, ttlMs: number): void {
   store.set(key, { data, timestamp: Date.now(), ttlMs });
 }
+
+export function clearCache(key?: string): void {
+  if (key) store.delete(key);
+  else store.clear();
+}

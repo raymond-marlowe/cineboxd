@@ -127,6 +127,6 @@ export async function scrapeCurzonVeezi(): Promise<Screening[]> {
   );
   const screenings = results.flatMap((r) => r.status === "fulfilled" ? r.value : []);
 
-  setCache(CACHE_KEY, screenings);
+  if (screenings.length > 0) setCache(CACHE_KEY, screenings);
   return screenings;
 }

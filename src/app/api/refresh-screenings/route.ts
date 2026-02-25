@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { scrapeAll } from "@/scrapers";
+import { scrapeAllWithBreakdown } from "@/scrapers";
 import { redis, SCREENINGS_KEY, SCREENINGS_UPDATED_KEY } from "@/lib/redis";
 import { Screening } from "@/lib/types";
+import { clearCache } from "@/lib/cache";
 
 const TTL_24H = 86400; // seconds
 
@@ -38,19 +39,34 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Bust in-process scraper caches so force=1 always re-fetches live data.
+  if (force) clearCache();
+
   try {
-    const screenings = await scrapeAll();
+    const { screenings, breakdown } = await scrapeAllWithBreakdown();
     const updatedAt = new Date().toISOString();
+
+    // Log per-scraper counts to server console.
+    for (const b of breakdown) {
+      if (b.error) {
+        console.error(`[refresh-screenings] ${b.name}: ERROR — ${b.error}`);
+      } else {
+        console.log(`[refresh-screenings] ${b.name}: ${b.count}`);
+      }
+    }
+    console.log(`[refresh-screenings] total: ${screenings.length}`);
 
     await Promise.all([
       redis.set(SCREENINGS_KEY, screenings, { ex: TTL_24H }),
       redis.set(SCREENINGS_UPDATED_KEY, updatedAt),
     ]);
 
+    const isDev = process.env.NODE_ENV === "development";
     return NextResponse.json({
       success: true,
       count: screenings.length,
       updatedAt,
+      ...(isDev ? { breakdown } : {}),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

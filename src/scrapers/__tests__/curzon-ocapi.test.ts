@@ -6,6 +6,7 @@ import {
   toLocalDateTime,
   cleanFilmTitle,
   OcapiResponse,
+  VENUES,
 } from "../curzon-ocapi";
 
 const fixture = JSON.parse(
@@ -189,5 +190,34 @@ describe("transformShowtimes edge cases", () => {
     const results = transformShowtimes(data, VENUE_MAP);
     expect(results).toHaveLength(1);
     expect(results[0].year).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VENUES constant — siteId correctness
+// ---------------------------------------------------------------------------
+describe("VENUES siteId mapping", () => {
+  it("contains exactly 10 London venues", () => {
+    expect(VENUES).toHaveLength(10);
+  });
+
+  it("uses WIM01 for Curzon Wimbledon", () => {
+    const wimbledon = VENUES.find((v) => v.name === "Curzon Wimbledon");
+    expect(wimbledon).toBeDefined();
+    expect(wimbledon?.siteId).toBe("WIM01");
+  });
+
+  it("all expected venues are present with correct siteIds", () => {
+    const map = new Map(VENUES.map((v) => [v.name, v.siteId]));
+    expect(map.get("Curzon Soho")).toBe("SOH1");
+    expect(map.get("Curzon Camden")).toBe("CAM1");
+    expect(map.get("Curzon Mayfair")).toBe("MAY1");
+    expect(map.get("Curzon Bloomsbury")).toBe("BLO1");
+    expect(map.get("Curzon Victoria")).toBe("VIC1");
+    expect(map.get("Curzon Hoxton")).toBe("HOX1");
+    expect(map.get("Curzon Richmond")).toBe("RIC1");
+    expect(map.get("Curzon Kingston")).toBe("KIN1");
+    expect(map.get("Curzon Wimbledon")).toBe("WIM01");
+    expect(map.get("Curzon Aldgate")).toBe("ALD1");
   });
 });

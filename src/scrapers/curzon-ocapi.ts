@@ -22,23 +22,21 @@ const DATE_WINDOW_DAYS = 7;
  * Initially Phase 1 (Soho + Camden) are active by default.
  * Set CURZON_SITE_IDS=SOH1,CAM1,MAY1,... to override.
  */
-const VENUES = [
-  // Phase 1 — active by default
-  { siteId: "SOH1",  name: "Curzon Soho" },
-  { siteId: "CAM1",  name: "Curzon Camden" },
-  // Phase 2 — enable via CURZON_SITE_IDS env var once Phase 1 is stable
-  { siteId: "MAY1",  name: "Curzon Mayfair" },
-  { siteId: "BLO1",  name: "Curzon Bloomsbury" },
-  { siteId: "VIC1",  name: "Curzon Victoria" },
-  { siteId: "HOX1",  name: "Curzon Hoxton" },
-  { siteId: "RIC1",  name: "Curzon Richmond" },
-  { siteId: "KIN1",  name: "Curzon Kingston" },
+export const VENUES = [
+  { siteId: "SOH1", name: "Curzon Soho" },
+  { siteId: "CAM1", name: "Curzon Camden" },
+  { siteId: "MAY1", name: "Curzon Mayfair" },
+  { siteId: "BLO1", name: "Curzon Bloomsbury" },
+  { siteId: "VIC1", name: "Curzon Victoria" },
+  { siteId: "HOX1", name: "Curzon Hoxton" },
+  { siteId: "RIC1", name: "Curzon Richmond" },
+  { siteId: "KIN1", name: "Curzon Kingston" },
   { siteId: "WIM01", name: "Curzon Wimbledon" },
-  { siteId: "ALD1",  name: "Curzon Aldgate" },
+  { siteId: "ALD1", name: "Curzon Aldgate" },
 ] as const;
 
-// Default active set (Phase 1). Override via CURZON_SITE_IDS=SOH1,CAM1,MAY1,...
-const DEFAULT_SITE_IDS = ["SOH1", "CAM1"];
+// All active London venues. Override via CURZON_SITE_IDS=SOH1,CAM1,...
+const DEFAULT_SITE_IDS = ["SOH1", "CAM1", "MAY1", "BLO1", "VIC1", "HOX1", "RIC1", "KIN1", "WIM01", "ALD1"];
 
 // ------- Auth token cache -----------------------------------------------
 // The Curzon site embeds an anonymous RSA-signed JWT (~12h TTL) in every
@@ -188,7 +186,10 @@ async function fetchDateShowtimes(
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     signal: AbortSignal.timeout(6000),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}${body ? `: ${body.slice(0, 500)}` : ""}`);
+  }
   return res.json() as Promise<OcapiResponse>;
 }
 
@@ -200,10 +201,12 @@ export async function scrapeCurzonOcapi(): Promise<Screening[]> {
 
   const start = Date.now();
 
-  // Resolve active venue set. CURZON_SITE_IDS overrides the default Phase-1 list.
-  const activeSiteIds = process.env.CURZON_SITE_IDS
-    ? process.env.CURZON_SITE_IDS.split(",").map((s) => s.trim()).filter(Boolean)
+  // Resolve active venue set. CURZON_SITE_IDS overrides the full default list.
+  const fromEnv = !!process.env.CURZON_SITE_IDS;
+  const activeSiteIds = fromEnv
+    ? process.env.CURZON_SITE_IDS!.split(",").map((s) => s.trim()).filter(Boolean)
     : DEFAULT_SITE_IDS;
+  console.log(`[curzon-ocapi] active siteIds (${fromEnv ? "CURZON_SITE_IDS env" : "default"}): ${activeSiteIds.join(", ")}`);
   const venueMap = new Map(
     VENUES.filter((v) => activeSiteIds.includes(v.siteId)).map((v) => [v.siteId, v.name])
   );
