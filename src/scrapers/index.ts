@@ -21,6 +21,9 @@ import { scrapeBFISouthbank } from "./bfi-southbank";
 import { scrapeCineLumiere } from "./cine-lumiere";
 import { scrapeArzner } from "./arzner";
 import { scrapeNickel } from "./nickel";
+import { scrapeCastleCinema } from "./castle-cinema";
+import { scrapeColdharbourBlue } from "./coldharbour-blue";
+import { scrapePeckhamplex } from "./peckhamplex";
 
 export type Scraper = () => Promise<Screening[]>;
 
@@ -53,6 +56,9 @@ const namedScrapers: { name: string; fn: Scraper }[] = [
   { name: "cine-lumiere",        fn: scrapeCineLumiere },
   { name: "arzner",              fn: scrapeArzner },
   { name: "nickel",              fn: scrapeNickel },
+  { name: "castle-cinema",       fn: scrapeCastleCinema },
+  { name: "coldharbour-blue",    fn: scrapeColdharbourBlue },
+  { name: "peckhamplex",         fn: scrapePeckhamplex },
 ];
 
 // Keep the flat array for any callers that still use it.

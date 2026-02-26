@@ -72,6 +72,9 @@ export const SUPPORTED_VENUES: Venue[] = [
   { name: "Ciné Lumière",    url: "https://www.institut-francais.org.uk/cine-lumiere/" },
   { name: "The Arzner",      url: "https://thearzner.com" },
   { name: "The Nickel",      url: "https://thenickel.co.uk" },
+  { name: "The Castle Cinema",               url: "https://thecastlecinema.com" },
+  { name: "Coldharbour Blue / Whirled Cinema", url: "https://www.coldharbourblue.com" },
+  { name: "Peckhamplex",                     url: "https://www.peckhamplex.london" },
 ];
 
 const CLAMP = 10;
