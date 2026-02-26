@@ -47,6 +47,7 @@ export const VENUE_COORDS: Record<string, VenueCoords> = {
   "Curzon Kingston":       { lat: 51.4101, lng: -0.3021 }, // Omni Centre, KT1 1RS
   "Curzon Wimbledon":      { lat: 51.4214, lng: -0.2051 }, // The Broadway, SW19 1QG
   "Curzon Aldgate":        { lat: 51.5141, lng: -0.0771 }, // Aldgate Tower, E1 8FA
+  "BFI Southbank":         { lat: 51.5054, lng: -0.1143 }, // Belvedere Rd, SE1 8XT
   // Everyman venues (ENABLE_EVERYMAN scraper)
   "Everyman Baker Street":          { lat: 51.5225, lng: -0.1573 }, // 96-98 Baker St, W1U 6TJ
   "Everyman Barnet":                { lat: 51.6479, lng: -0.2063 }, // The Spires, High St, EN5 5XY
