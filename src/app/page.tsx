@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { MatchedScreening, Screening } from "@/lib/types";
 import { generateIcsEvent, generateIcsFile, downloadIcs } from "@/lib/ics";
 import dynamic from "next/dynamic";
@@ -29,12 +29,14 @@ interface MatchResponse {
 type AppState = "upload" | "loading" | "results";
 type ViewMode = "list" | "grid" | "calendar" | "map";
 type InputMode = "solo" | "together";
+type UrlMode = "user" | "users" | "list";
 
 const USER_COLORS = ["#f59e0b", "#3b82f6", "#10b981", "#8b5cf6", "#ef4444"];
 
 function HomeInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
 
   const [state, setState] = useState<AppState>("upload");
   const [data, setData] = useState<MatchResponse | null>(null);
@@ -68,6 +70,59 @@ function HomeInner() {
   const [drawerMatch, setDrawerMatch] = useState<MatchedScreening | null>(null);
   const [drawerVenueExpanded, setDrawerVenueExpanded] = useState<Record<string, boolean>>({});
 
+  const updateUrl = useCallback(
+    ({
+      mode,
+      user,
+      users,
+      listId,
+      view,
+    }: {
+      mode?: UrlMode;
+      user?: string;
+      users?: string[];
+      listId?: string;
+      view?: ViewMode;
+    }) => {
+      const params = new URLSearchParams(searchParams.toString());
+
+      if (mode) {
+        params.delete("user");
+        params.delete("users");
+        params.delete("list");
+
+        if (mode === "user" && user) {
+          params.set("user", user);
+        } else if (mode === "users" && users && users.length > 0) {
+          params.set("users", users.join(","));
+        } else if (mode === "list" && listId) {
+          params.set("list", listId);
+        }
+      }
+
+      if (view && view !== "list") {
+        params.set("view", view);
+      } else if (view === "list") {
+        params.delete("view");
+      }
+
+      const nextQs = params.toString();
+      const currentQs = searchParams.toString();
+      if (nextQs === currentQs) return;
+
+      router.replace(`${pathname}${nextQs ? `?${nextQs}` : ""}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
+  const handleViewChange = useCallback(
+    (nextView: ViewMode) => {
+      setViewMode(nextView);
+      updateUrl({ view: nextView });
+    },
+    [updateUrl]
+  );
+
   const handleUsername = useCallback(
     async (name: string) => {
       const trimmed = name.trim();
@@ -98,14 +153,14 @@ function HomeInner() {
         setData(json);
         setState("results");
         setLoadingUsername(null);
-        router.replace(`?user=${encodeURIComponent(trimmed)}`);
+        updateUrl({ mode: "user", user: trimmed, view: viewMode });
       } catch {
         setError("Failed to connect to server");
         setState("upload");
         setLoadingUsername(null);
       }
     },
-    [router]
+    [updateUrl, viewMode]
   );
 
   const handleGroup = useCallback(
@@ -142,14 +197,14 @@ function HomeInner() {
         setState("results");
         setLoadingUsername(null);
         setPartialExpanded(false);
-        router.replace(`?users=${trimmed.map(encodeURIComponent).join(",")}`);
+        updateUrl({ mode: "users", users: trimmed, view: viewMode });
       } catch {
         setError("Failed to connect to server");
         setState("upload");
         setLoadingUsername(null);
       }
     },
-    [router]
+    [updateUrl, viewMode]
   );
 
   const handleListId = useCallback(
@@ -180,12 +235,13 @@ function HomeInner() {
 
         setData(json);
         setState("results");
+        updateUrl({ mode: "list", listId: json.listId ?? listId, view: viewMode });
       } catch {
         setError("Failed to connect to server");
         setState("upload");
       }
     },
-    []
+    [updateUrl, viewMode]
   );
 
   // Auto-submit from URL query param on mount
@@ -225,15 +281,16 @@ function HomeInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep view= and venue= query params in sync with state so the Share button captures them
+  // Keep venue= query param in sync so shared links include the active venue filter.
   useEffect(() => {
     if (state !== "results") return;
-    const params = new URLSearchParams(window.location.search);
-    if (viewMode === "list") params.delete("view"); else params.set("view", viewMode);
-    if (venueFilter === "all") params.delete("venue"); else params.set("venue", venueFilter);
-    const qs = params.toString();
-    window.history.replaceState(null, "", window.location.pathname + (qs ? "?" + qs : ""));
-  }, [viewMode, venueFilter, state]);
+    const params = new URLSearchParams(searchParams.toString());
+    if (venueFilter === "all") params.delete("venue");
+    else params.set("venue", venueFilter);
+    const nextQs = params.toString();
+    if (nextQs === searchParams.toString()) return;
+    router.replace(`${pathname}${nextQs ? `?${nextQs}` : ""}`, { scroll: false });
+  }, [pathname, router, searchParams, state, venueFilter]);
 
   useEffect(() => {
     if (!drawerMatch) return;
@@ -279,14 +336,12 @@ function HomeInner() {
 
       setData(json);
       setState("results");
-      if (json.listId) {
-        router.replace(`?list=${json.listId}`);
-      }
+      updateUrl({ mode: "list", listId: json.listId, view: viewMode });
     } catch {
       setError("Failed to connect to server");
       setState("upload");
     }
-  }, [router]);
+  }, [updateUrl, viewMode]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -1250,7 +1305,7 @@ function HomeInner() {
 
                     <div className="inline-flex flex-none shrink-0 rounded-lg border border-border overflow-hidden">
                       <button
-                        onClick={() => setViewMode("list")}
+                        onClick={() => handleViewChange("list")}
                         className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "list"
                             ? "bg-accent text-background font-medium"
@@ -1260,7 +1315,7 @@ function HomeInner() {
                         List
                       </button>
                       <button
-                        onClick={() => setViewMode("grid")}
+                        onClick={() => handleViewChange("grid")}
                         className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "grid"
                             ? "bg-accent text-background font-medium"
@@ -1270,7 +1325,7 @@ function HomeInner() {
                         Grid
                       </button>
                       <button
-                        onClick={() => setViewMode("calendar")}
+                        onClick={() => handleViewChange("calendar")}
                         className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "calendar"
                             ? "bg-accent text-background font-medium"
@@ -1280,7 +1335,7 @@ function HomeInner() {
                         Calendar
                       </button>
                       <button
-                        onClick={() => setViewMode("map")}
+                        onClick={() => handleViewChange("map")}
                         className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "map"
                             ? "bg-accent text-background font-medium"
@@ -1340,7 +1395,10 @@ function HomeInner() {
                     matches={filteredShared ?? []}
                     postcodeCoords={postcodeCoords}
                     maxDistanceMiles={maxDistanceMiles}
-                    onVenueSelect={(v) => { setVenueFilter(v); setViewMode("list"); }}
+                    onVenueSelect={(v) => {
+                      setVenueFilter(v);
+                      handleViewChange("list");
+                    }}
                   />
                 ) : viewMode === "grid" ? (
                   <>
@@ -1483,7 +1541,7 @@ function HomeInner() {
 
                     <div className="inline-flex flex-none shrink-0 rounded-lg border border-border overflow-hidden">
                       <button
-                        onClick={() => setViewMode("list")}
+                        onClick={() => handleViewChange("list")}
                         className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "list"
                             ? "bg-accent text-background font-medium"
@@ -1493,7 +1551,7 @@ function HomeInner() {
                         List
                       </button>
                       <button
-                        onClick={() => setViewMode("grid")}
+                        onClick={() => handleViewChange("grid")}
                         className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "grid"
                             ? "bg-accent text-background font-medium"
@@ -1503,7 +1561,7 @@ function HomeInner() {
                         Grid
                       </button>
                       <button
-                        onClick={() => setViewMode("calendar")}
+                        onClick={() => handleViewChange("calendar")}
                         className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "calendar"
                             ? "bg-accent text-background font-medium"
@@ -1513,7 +1571,7 @@ function HomeInner() {
                         Calendar
                       </button>
                       <button
-                        onClick={() => setViewMode("map")}
+                        onClick={() => handleViewChange("map")}
                         className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "map"
                             ? "bg-accent text-background font-medium"
@@ -1637,7 +1695,10 @@ function HomeInner() {
                     matches={filteredMatches ?? []}
                     postcodeCoords={postcodeCoords}
                     maxDistanceMiles={maxDistanceMiles}
-                    onVenueSelect={(v) => { setVenueFilter(v); setViewMode("list"); }}
+                    onVenueSelect={(v) => {
+                      setVenueFilter(v);
+                      handleViewChange("list");
+                    }}
                   />
                 ) : viewMode === "grid" ? (
                   filteredMatches && filteredMatches.length > 0 ? (
