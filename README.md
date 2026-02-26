@@ -36,6 +36,7 @@ For the screenings cache (optional but recommended in production), set `KV_REST_
 - **Three views** — list view with film cards, monthly calendar view, or interactive map view
 - **Venue filtering** — filter results by cinema
 - **Location filtering** — enter a UK postcode to filter and sort by distance
+- **Venues directory** — `/venues` lists all 27+ supported cinemas with search, A–Z / by-chain sort, and a Leaflet map view showing all venue pins
 
 ## Architecture
 

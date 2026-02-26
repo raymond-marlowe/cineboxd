@@ -34,14 +34,19 @@ cineboxd/
 │   │   │       └── route.ts          # GET/POST /api/refresh-screenings — cache health + scrape trigger
 │   │   ├── about/
 │   │   │   └── page.tsx              # /about — static about page
+│   │   ├── venues/
+│   │   │   └── page.tsx              # /venues — supported cinemas directory (static, prerendered)
 │   │   ├── globals.css               # CSS custom properties (colors, fonts, Leaflet overrides)
 │   │   ├── layout.tsx                # Root HTML layout, metadata, footer
 │   │   └── page.tsx                  # / — main page (input, results, calendar, map)
 │   │
 │   ├── components/
 │   │   ├── calendar.tsx              # Monthly calendar view for screenings
-│   │   ├── venue-map.tsx             # Interactive Leaflet map view (react-leaflet)
-│   │   └── SupportedVenues.tsx       # Chip strip listing all supported cinemas
+│   │   ├── FilmGrid.tsx              # Condensed grid view for results
+│   │   ├── venue-map.tsx             # Interactive Leaflet map view for results page (react-leaflet)
+│   │   ├── venues-directory-map.tsx  # Leaflet map showing all supported venue pins (/venues)
+│   │   ├── SupportedVenues.tsx       # Homepage teaser chip strip (first 10 venues + "View full list →")
+│   │   └── SupportedVenuesDirectory.tsx  # Full venue directory with search, sort, and map toggle
 │   │
 │   ├── lib/                          # Shared utilities
 │   │   ├── types.ts                  # TypeScript interfaces (WatchlistFilm, Screening, Subscription, etc.)
@@ -56,13 +61,13 @@ cineboxd/
 │   │   ├── subscriptions.ts          # JSON-file subscription store (read/write/add/remove)
 │   │   └── venues.ts                 # Hardcoded venue coordinates + Haversine distance utilities
 │   │
-│   └── scrapers/                     # Cinema listing scrapers (18 active, 3 flag-gated)
-│       ├── index.ts                  # Runs all scrapers in parallel, returns per-scraper breakdown
+│   └── scrapers/                     # Cinema listing scrapers (27 defined; 3 flag-gated, 1 disabled)
+│       ├── index.ts                  # Runs all scrapers concurrently with per-scraper timeout, returns breakdown
 │       ├── prince-charles.ts         # Prince Charles Cinema (HTML)
 │       ├── close-up.ts               # Close-Up Film Centre (HTML)
 │       ├── ica.ts                    # ICA Cinema (HTML)
-│       ├── barbican.ts               # Barbican Cinema (HTML)
-│       ├── rio.ts                    # Rio Cinema (embedded JSON)
+│       ├── barbican.ts               # Barbican Cinema (Spektrix HTML)
+│       ├── rio.ts                    # Rio Cinema (embedded JSON — Savoy Systems)
 │       ├── genesis.ts                # Genesis Cinema (HTML — Admit-One CMS)
 │       ├── arthouse-crouch-end.ts    # Arthouse Crouch End (HTML — Savoy Systems)
 │       ├── act-one.ts                # ActOne Cinema (pre-rendered HTML — Indy Systems SPA)
@@ -75,7 +80,16 @@ cineboxd/
 │       ├── curzon-veezi.ts           # Curzon Sea Containers + Goldsmiths (Veezi HTML)
 │       ├── curzon-ocapi.ts           # 10 Curzon main-site venues (Vista OCAPI — ENABLE_CURZON_OCAPI)
 │       ├── picturehouse.ts           # 11 Picturehouse London venues (JSON API — ENABLE_PICTUREHOUSE)
-│       └── everyman.ts               # 16 Everyman London venues (Boxoffice JSON API — ENABLE_EVERYMAN)
+│       ├── everyman.ts               # 16 Everyman London venues (Boxoffice JSON API — ENABLE_EVERYMAN)
+│       ├── bfi-southbank.ts          # BFI Southbank (disabled stub — returns [])
+│       ├── cine-lumiere.ts           # Ciné Lumière (HTML — Savoy Systems)
+│       ├── arzner.ts                 # The Arzner (embedded JSON — Savoy Systems)
+│       ├── nickel.ts                 # The Nickel (Next.js SSR homepage)
+│       ├── castle-cinema.ts          # The Castle Cinema (server-rendered calendar — data-start-time attrs)
+│       ├── coldharbour-blue.ts       # Coldharbour Blue / Whirled Cinema (WordPress/Flickity HTML)
+│       ├── peckhamplex.ts            # Peckhamplex (public HTML API — Veezi ticketing)
+│       ├── olympic-cinema.ts         # Olympic Cinema Barnes + 2 sister venues (mycloudcinema.com REST API)
+│       └── chiswick-cinema.ts        # Chiswick Cinema (per-movie page scrape — JSON-LD + booking links)
 │
 ├── .env.local                        # Environment variables (TMDB_API_KEY, KV_*, REFRESH_SECRET)
 ├── next.config.ts                    # Next.js configuration
@@ -220,7 +234,7 @@ JSON response ──────────────────────
 | Watchlist from username | `letterboxd-rss.ts` |
 | Watchlist from CSV | `csv-parser.ts` |
 | Screenings cache read | `redis.ts`, `api/match/route.ts` |
-| Cinema scraping (fallback / cron) | `scrapers/index.ts`, `prince-charles.ts`, `close-up.ts`, `ica.ts`, `barbican.ts`, `rio.ts`, `genesis.ts`, `arthouse-crouch-end.ts`, `act-one.ts`, `phoenix.ts`, `lexi.ts`, `garden.ts`, `regent-street.ts`, `rich-mix.ts`, `jw3.ts`, `curzon-veezi.ts`, `curzon-ocapi.ts`, `picturehouse.ts`, `everyman.ts` |
+| Cinema scraping (fallback / cron) | `scrapers/index.ts`, `prince-charles.ts`, `close-up.ts`, `ica.ts`, `barbican.ts`, `rio.ts`, `genesis.ts`, `arthouse-crouch-end.ts`, `act-one.ts`, `phoenix.ts`, `lexi.ts`, `garden.ts`, `regent-street.ts`, `rich-mix.ts`, `jw3.ts`, `curzon-veezi.ts`, `curzon-ocapi.ts`, `picturehouse.ts`, `everyman.ts`, `cine-lumiere.ts`, `arzner.ts`, `nickel.ts`, `castle-cinema.ts`, `coldharbour-blue.ts`, `peckhamplex.ts`, `olympic-cinema.ts`, `chiswick-cinema.ts` |
 | Film matching | `matcher.ts`, `csv-parser.ts` (for `normalizeTitle`) |
 | TMDB enrichment | `tmdb.ts`, `cache.ts` |
 | Results display | `page.tsx`, `calendar.tsx` |
@@ -517,6 +531,121 @@ JSON response ──────────────────────
 - **Returns:** Title, year (null — not in schedule API response), date, time, venue, booking URL, format
 - **Reliability:** High — structured JSON API, no HTML parsing, no auth tokens to refresh.
 
+### BFI Southbank — DISABLED (stub)
+
+- **Status:** Disabled — returns `[]` unconditionally. A stub entry exists in `namedScrapers` so the scraper appears in breakdown logs and can be re-enabled without touching `index.ts`.
+- **Reason:** BFI Southbank's website uses heavy client-side rendering and bot protection that makes server-side scraping unreliable in the Vercel environment.
+
+### Ciné Lumière — ENABLED
+
+- **URL:** `https://cinelumiere.savoysystems.co.uk/CineLumiere.dll/TSelectItems` (or similar Savoy Systems DLL endpoint)
+- **Platform:** Savoy Systems (HTML-rendered schedule page)
+- **Method:** HTML scraping with Cheerio
+- **Selectors:**
+  - `div.programme` — one per film
+  - `h2.subtitle.first a` — film title link
+  - `td.PeformanceListDate` — date header (e.g. "Friday 6 Mar 2026")
+  - `span.StartTimeAndStatus > a.Button` — booking link; text is the time ("19:00")
+- **Sold-out handling:** Buttons labelled "Closed for Booking" are skipped; "Sold Out" entries get `bookingUrl: null`
+- **Date parsing:** Full date string parsed via month-name lookup + year inference
+- **Returns:** Title, year (from trailing `(YYYY)` in title), date, time, venue, booking URL, format (null)
+- **Reliability:** Medium-high — Savoy Systems DLL pages are stable but the CSS class names are idiosyncratic.
+
+### The Arzner — ENABLED
+
+- **URL:** `https://thearzner.com/TheArzner.dll/WhatsOn`
+- **Platform:** Savoy Systems (same embedded JSON pattern as Rio Cinema and The Lexi Cinema)
+- **Method:** Embedded JSON extraction
+- **Data source:** Page contains `var Events =\n{JSON}` — the scraper finds this line and parses the next line
+- **JSON structure:** `{ Events: [{ Title, Year, Tags: [{ Format }], Performances: [{ StartDate, StartTimeAndNotes, IsSoldOut, URL }] }] }`
+- **Booking URL:** `https://thearzner.com/TheArzner.dll/` + `performance.URL`
+- **Returns:** Title, year, date, time, venue, booking URL (null if sold out), format
+- **Reliability:** High — same structured JSON approach as Rio/Lexi.
+
+### The Nickel — ENABLED
+
+- **URL:** `https://thenickel.co.uk` (homepage)
+- **Platform:** Next.js (client-rendered detail pages; homepage is SSR)
+- **Method:** HTML scraping of the SSR homepage with Cheerio; detail pages are client-rendered and unusable
+- **Selectors:**
+  - `a[href^="/screening/"]` — screening card links (capped at 40)
+  - `<p>` with `uppercase font-bold` classes → film title (converted to Title Case)
+  - Leaf `<div>` containing day-name abbreviation + `DD.M` pattern (e.g. "Thursday 26.2") → date
+  - Time: "Film HH:MMam/pm" text preferred over "Doors" prefix; `parseAmPmTime` converts to 24h
+- **Sold-out handling:** Leaf div text `=== "Sold Out"` → `bookingUrl: null`
+- **Returns:** Title, date, time, venue, booking URL, year (null), format (null)
+- **Reliability:** Medium — depends on SSR homepage structure; title-case conversion may not match Letterboxd for all films.
+
+### The Castle Cinema — ENABLED
+
+- **URL:** `https://thecastlecinema.com/calendar/`
+- **Method:** Single GET; entire schedule is server-rendered (no pagination or JS required)
+- **Selectors:**
+  - `#slim-tiles` children → `div.programme-tile` — one per film
+  - `h1.ellipse` — film title
+  - `a.performance-button[data-start-time]` — one per screening; `data-start-time="2026-02-26T16:00:00"` provides date (slice `[0:10]`) and time (slice `[11:16]`)
+- **Sold-out / unavailable:** Buttons with class `off-sale inactive` → `bookingUrl: null`
+- **Returns:** Title, date, time, venue, booking URL, year (null), format (null)
+- **Reliability:** High — data attributes are stable structural identifiers; no date parsing heuristics needed.
+
+### Coldharbour Blue / Whirled Cinema — ENABLED
+
+- **URL:** `https://www.coldharbourblue.com`
+- **Platform:** WordPress with Flickity carousel — fully server-rendered
+- **Method:** HTML scraping with Cheerio
+- **Selectors:**
+  - `div.slideshow-slide.movie` — one per performance (carousel slide)
+  - `div.meta div.date` — date in `DD/MM/YY` format (e.g. "26/02/26"); year prepended with `"20"` → `YYYY-MM-DD`
+  - `div.meta div.time` — time already in 24h `HH:MM` format
+  - `div.actions a.button-secondary:not(.popup-youtube)` — booking link
+- **Returns:** Title (from slide heading), date, time, venue, booking URL, year (null), format (null)
+- **Reliability:** Medium — WordPress themes are subject to change; Flickity slide class names are theme-controlled.
+
+### Peckhamplex — ENABLED
+
+- **URL:** `https://www.peckhamplex.london/api/v1/films/listings/days`
+- **Platform:** Veezi ticketing (booking URLs point to `ticketing.eu.veezi.com`)
+- **Method:** Fetches a public HTML fragment API endpoint (not the JavaScript-rendered main page)
+- **Selectors:**
+  - `div.films-listings` — one per day section
+  - `h3` header — full date text ("Thursday 26th February 2026"); ordinal suffix stripped before parsing
+  - `div.film-title-wrapper div.title` — film title
+  - `a.btn.btn-info` — one per screening slot; href is the direct Veezi booking URL
+  - `title` attribute on booking links — special screening label (e.g. "Hard of Hearing Screening") → `format`
+- **Returns:** Title, date, time, venue, booking URL, year (null), format
+- **Reliability:** High — internal JSON/HTML API endpoint is more stable than a JS-rendered consumer page.
+
+### Olympic Cinema (3 venues) — ENABLED
+
+- **Venues:** Olympic Cinema (Barnes), The Cinema in the Power Station, The Cinema at Selfridges
+- **Platform:** Empire / mycloudcinema.com (custom cinema management system)
+- **Method:** Two-phase REST API approach:
+  1. **Discovery:** Fetch each venue's public `whats-on` page, then crawl detail pages (up to 200 IDs per venue, concurrency 8) to collect booking IDs embedded in `https://{host}/#/book/{id}` links
+  2. **Showtime fetch:** `GET https://{host}/webservices/show_times/get?id={id}&ignore_bookable=false&ts={unix}` — one request per booking ID (concurrency 8)
+- **Showtime API response:** `{ data: [{ title, show_time (ISO UTC), bookable, sold_out, allow_purchases }] }`
+- **Date/time:** `show_time` is a UTC ISO string; converted to London local time via `Intl.DateTimeFormat`
+- **Booking URL:** `https://{host}/#/book/{id}` — set to `null` if `bookable === false`, `allow_purchases === false`, or `sold_out === true`
+- **Deduplication:** By booking URL or composite key `title|date|time|venue`
+- **Timeout risk:** Up to 600 HTTP requests across 3 venues; bounded by the global 25s per-scraper timeout
+- **Returns:** Title, date, time, venue, booking URL, year (null), format (null)
+- **Reliability:** Medium — discovery depends on HTML link extraction heuristics; API itself is structured.
+
+### Chiswick Cinema — ENABLED
+
+- **URL (listing):** `https://www.chiswickcinema.co.uk/whats-on`
+- **URL (per film):** `https://www.chiswickcinema.co.uk/movie/{slug}`
+- **Method:** Two-stage HTML scraping with Cheerio + JSON-LD fallback
+  1. Listing page → `a[href*="/movie/"]` links (up to 60 movies)
+  2. Each movie page (parallel `Promise.allSettled`):
+     - Primary: `a[href*="/checkout/showing/"]` booking links; button text parsed as "Month DDth, HH:MMam/pm"
+     - Fallback: `<script type="application/ld+json">` → `startDate` ISO field + `url` field
+- **Title extraction:** `<h1>` or `<title>` (with " | Chiswick Cinema" suffix stripped); year extracted from trailing `(YYYY)` if present
+- **Date/time parsing:** Custom `parseDateTimeLabel` handles "March 26th, 7:30pm" → `YYYY-MM-DD` + `HH:MM` with year rollover logic
+- **Cap:** 120 screenings total (60 movie pages × ~2 screenings each on average)
+- **Timeout risk:** Up to 60 parallel fetches; bounded by the global 25s per-scraper timeout
+- **Returns:** Title, year, date, time, venue, booking URL, format (null)
+- **Reliability:** Medium-high — movie page structure is stable; JSON-LD fallback adds resilience.
+
 ## 6. Matching Logic
 
 Film matching happens in `src/lib/matcher.ts` and uses a three-stage pipeline:
@@ -561,6 +690,9 @@ Film matching happens in `src/lib/matcher.ts` and uses a three-stage pipeline:
 - **Read by:** `GET /api/match` — if the key exists, the live scrape is skipped entirely
 - **Fallback:** If `screenings:v1` is missing (first deploy, cache expired), `/api/match` falls back to a live scrape and writes the result back to Redis
 - **Cooldown:** `POST /api/refresh-screenings` returns `{ skipped: true }` if `screenings:updated_at` is less than 30 minutes old, preventing redundant scrapes from rapid cron retries
+- **Safe-write guard:** After scraping, if the existing cache has >500 entries and the new result is fewer than 60% of that count, the cache is preserved and the endpoint returns `{ success: false, reason: "degraded" }`. This prevents a partially-blocked scrape run from overwriting a healthy cache.
+- **Per-scraper timeout:** Each scraper is individually wrapped in a 25-second `Promise.race` timeout in `scrapers/index.ts`. This bounds total wall time to ≤25s regardless of scraper count and prevents a single hung scraper (e.g. one crawling hundreds of pages) from blocking the Redis write.
+- **Breakdown response:** The POST response always includes `breakdown: [{ name, count, durationMs, error?, sample? }]` — one entry per scraper — enabling per-scraper health checks without needing to read Vercel function logs.
 
 ### TMDB cache (`src/lib/cache.ts` — in-memory)
 - **Keys:** `tmdb-{normalized-title}-{year-or-unknown}` (e.g. `tmdb-cure-1997`)
@@ -688,26 +820,36 @@ npm run dev
 
 | Cinema | Status | Reliability | Notes |
 |---|---|---|---|
-| Prince Charles Cinema | Active | High | Stable HTML structure, good data quality |
-| Barbican Cinema | Active | High | Well-structured BEM markup |
-| Rio Cinema | Active | High | Embedded JSON, stable but fragile extraction |
-| The Lexi Cinema | Active | High | Embedded JSON (Savoy Systems) |
+| Prince Charles Cinema | Active | High | Stable HTML structure |
+| Barbican Cinema | Active | High | Spektrix-backed server-rendered HTML |
+| Rio Cinema | Active | High | Embedded JSON — Savoy Systems |
+| The Lexi Cinema | Active | High | Embedded JSON — Savoy Systems |
+| The Arzner | Active | High | Embedded JSON — Savoy Systems |
 | Garden Cinema | Active | High | Semantic HTML with data attributes |
-| Rich Mix | Active | High | Standard two-pass HTML (Spektrix) |
+| Rich Mix | Active | High | Two-pass HTML — Spektrix |
 | JW3 | Active | High | Public Spektrix REST API |
-| Genesis Cinema | Active | High | Stable panel IDs (Admit-One CMS) |
+| Genesis Cinema | Active | High | Stable panel IDs — Admit-One CMS |
+| The Castle Cinema | Active | High | data-start-time attributes — no date heuristics |
+| Peckhamplex | Active | High | Public HTML API endpoint — Veezi ticketing |
 | Curzon Sea Containers | Active | High | Veezi server-rendered HTML |
 | Curzon Goldsmiths | Active | High | Veezi server-rendered HTML |
-| Curzon Soho/Camden/Mayfair/Bloomsbury/Victoria/Hoxton/Richmond/Kingston/Wimbledon/Aldgate | Active (flag) | High | Vista OCAPI JSON — requires `ENABLE_CURZON_OCAPI=true` |
-| Picturehouse (11 venues) | Active (flag) | High | Structured JSON API — requires `ENABLE_PICTUREHOUSE=true` |
-| Everyman (16 venues) | Active (flag) | High | Boxoffice/Webedia JSON API — requires `ENABLE_EVERYMAN=true` |
+| Curzon Soho/Camden/Mayfair/Bloomsbury/Victoria/Hoxton/Richmond/Kingston/Wimbledon/Aldgate | Active (flag) | High | Vista OCAPI JSON — `ENABLE_CURZON_OCAPI=true` |
+| Picturehouse (11 venues) | Active (flag) | High | Structured JSON API — `ENABLE_PICTUREHOUSE=true` |
+| Everyman (16 venues) | Active (flag) | High | Boxoffice/Webedia JSON API — `ENABLE_EVERYMAN=true` |
+| Regent Street Cinema | Active | Medium-high | GraphQL — Indy Systems; two round-trips per film |
+| Chiswick Cinema | Active | Medium-high | Per-movie page scrape; JSON-LD fallback |
+| Olympic Cinema (Barnes) | Active | Medium | mycloudcinema.com REST API; link-discovery phase |
+| The Cinema in the Power Station | Active | Medium | Same platform as Olympic Cinema |
+| The Cinema at Selfridges | Active | Medium | Same platform as Olympic Cinema |
+| Ciné Lumière | Active | Medium-high | HTML — Savoy Systems DLL |
+| The Nickel | Active | Medium | SSR homepage only; detail pages are client-rendered |
+| Coldharbour Blue / Whirled Cinema | Active | Medium | WordPress/Flickity HTML |
 | Close-Up Film Centre | Active | Medium | Fragile CSS selectors, no year data |
 | ICA Cinema | Active | Medium | Date-finding heuristic walks siblings backwards |
 | Arthouse Crouch End | Active | Medium | WordPress/Elementor — class names may change |
 | Phoenix Cinema | Active | Medium | Two-stage Savoy Systems scrape |
-| Regent Street Cinema | Active | Medium-high | GraphQL (Indy Systems) — two round-trips per film |
-| ActOne Cinema | Active | Medium | Pre-rendered HTML only (Indy Systems SPA) — today only |
-| Everyman Cinema | Not built | — | Client-side rendered, not scrapable |
+| ActOne Cinema | Active | Medium | Pre-rendered HTML only — Indy Systems SPA — today only |
+| BFI Southbank | Disabled | — | Stub returns []; bot protection prevents reliable scraping |
 
 ### Known limitations
 
@@ -822,26 +964,42 @@ Users can enter a UK postcode to filter and sort results by proximity to each ci
 
 ### Venue Coordinates
 
-Coordinates are hardcoded. Keys must exactly match the `venue` string emitted by each scraper:
+Coordinates are hardcoded in `src/lib/venues.ts`. Keys must exactly match the `venue` string emitted by each scraper. All 27+ scraped venues currently have entries.
+
+**Independent venues:**
 
 | Venue string | Address |
 |---|---|
 | `"Prince Charles Cinema"` | 7 Leicester Place, WC2H 7BY |
 | `"Close-Up Film Centre"` | 97 Sclater Street, E1 6HR |
 | `"ICA Cinema"` | The Mall, SW1Y 5AH |
-| `"Barbican Cinema"` | Barbican Centre, Silk St, EC2Y 8DS |
+| `"Barbican Cinema"` | Barbican Centre, EC2Y 8DS |
 | `"Rio Cinema"` | 107 Kingsland High St, E8 2PB |
 | `"Genesis Cinema"` | 93-95 Mile End Rd, E1 4UJ |
 | `"Arthouse Crouch End"` | 159A Tottenham Lane, N8 9BT |
-| `"ActOne Cinema"` | 3 Medieval Street, SE1 2BY |
-| `"Phoenix Cinema"` | 52 High Rd, N2 9PJ |
+| `"ActOne Cinema"` | 119-121 High St, Acton, W3 6NA |
+| `"Phoenix Cinema"` | 52 High Rd, East Finchley, N2 9PJ |
 | `"The Lexi Cinema"` | 194B Chamberlayne Rd, NW10 3JU |
-| `"Garden Cinema"` | 22-23 Great Newport St, WC2H 7JS |
-| `"Regent Street Cinema"` | 309 Regent St, W1B 2UW |
+| `"Garden Cinema"` | 7-12 Shorts Gardens, WC2H 9AT |
+| `"Regent Street Cinema"` | 49 Regent St, W1B 4JY |
 | `"Rich Mix"` | 35-47 Bethnal Green Rd, E1 6LA |
 | `"JW3"` | 341-351 Finchley Rd, NW3 6ET |
+| `"Curzon Sea Containers"` | Sea Containers House, SE1 9PH |
+| `"Curzon Goldsmiths"` | Lewisham Way, SE14 6NW |
+| `"Ciné Lumière"` | 17 Queensberry Place, SW7 2DT |
+| `"The Arzner"` | 35 Floral Street, WC2E 9DP |
+| `"The Nickel"` | 23 Coldharbour Lane, SW9 8PJ |
+| `"The Castle Cinema"` | 64-66 Brooksby's Walk, E9 6DA |
+| `"Coldharbour Blue / Whirled Cinema"` | Hardess Street, SE24 0HJ |
+| `"Peckhamplex"` | 95A Rye Lane, SE15 4ST |
+| `"Olympic Cinema (Barnes)"` | 117-123 Church Rd, SW13 9HL |
+| `"The Cinema in the Power Station"` | Circus Rd W, SW11 8DD |
+| `"The Cinema at Selfridges"` | 400 Oxford St, W1A 1AB |
+| `"Chiswick Cinema"` | 94-96 Chiswick High Rd, W4 1SH |
 
-To add a new venue: add its scraper's `venue` constant as a key in `VENUE_COORDS` in `venues.ts`.
+Curzon OCAPI, Picturehouse, and Everyman venues are also fully covered — see `src/lib/venues.ts` for the complete list.
+
+To add a new venue: add its scraper's `venue` constant as a key in `VENUE_COORDS` in `venues.ts`. Venues without a `VENUE_COORDS` entry appear in the list view on `/venues` but not on the map; the `/venues` page shows a "Missing coords (N)" indicator for maintenance.
 
 ### Geocoding
 
@@ -866,3 +1024,33 @@ No API key required. UK postcodes only.
 ### No New Environment Variables or API Routes
 
 Everything runs client-side. No server changes were needed.
+
+---
+
+## Venues Directory Page (`/venues`)
+
+### Overview
+
+`/venues` is a static prerendered page listing all supported cinemas. It is separate from the homepage teaser (which shows 10 chips + a "View full list →" link). Its purpose is discoverability and maintenance.
+
+### Source Files
+
+| File | Purpose |
+|---|---|
+| `src/app/venues/page.tsx` | Static Next.js App Router page; server component (prerendered at build time) |
+| `src/components/SupportedVenuesDirectory.tsx` | Client component with search, sort, map/list toggle, and coverage indicator |
+| `src/components/venues-directory-map.tsx` | Leaflet map showing all mapped venues as pins (lazy-loaded via `dynamic(..., { ssr: false })`) |
+| `src/components/SupportedVenues.tsx` | Homepage teaser (server component); shows first 10 venues + "View full list →" chip |
+
+### Features
+
+- **Search:** Client-side text filter across all venue names
+- **Sort — A–Z (default):** All venues sorted alphabetically by display name
+- **Sort — By chain:** Venues grouped into named chains (Curzon, Everyman, Picturehouse) and Independent; sections are alphabetical within each group; Independent is always last
+- **Chain detection heuristic:** `name.startsWith("Curzon ")` → Curzon; `name.startsWith("Everyman ")` → Everyman; `name.includes("Picturehouse")` → Picturehouse; otherwise → Independent
+- **Map view:** Leaflet map (dark CartoDB tile layer) with orange dot pins for all venues that have a `VENUE_COORDS` entry; clicking a pin shows the venue name and a "Website ↗" link
+- **Coverage indicator:** Footer line shows "Mapped: X / Y venues"; any venues missing from `VENUE_COORDS` appear in a collapsible "Missing coords" list for maintenance
+
+### Adding a new venue
+
+See the four-step checklist in the MEMORY.md developer notes. The `/venues` page automatically reflects changes to `SUPPORTED_VENUES` and `VENUE_COORDS` at the next build.
