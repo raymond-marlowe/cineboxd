@@ -1,6 +1,4 @@
-"use client";
-
-import { useState } from "react";
+import Link from "next/link";
 
 export interface Venue {
   name: string;
@@ -87,11 +85,8 @@ const chipBase =
   "inline-flex items-center text-sm px-2.5 py-0.5 rounded-full border border-white/10 bg-white/5 transition-colors";
 
 export default function SupportedVenues({ venues = SUPPORTED_VENUES }: { venues?: Venue[] }) {
-  const [expanded, setExpanded] = useState(false);
-
-  const hidden = venues.length - CLAMP;
-  const visible = expanded || hidden <= 0 ? venues : venues.slice(0, CLAMP);
-  const listId = "supported-venues-list";
+  const teaser = venues.slice(0, CLAMP);
+  const hiddenCount = venues.length - CLAMP;
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 text-center space-y-2">
@@ -105,12 +100,9 @@ export default function SupportedVenues({ venues = SUPPORTED_VENUES }: { venues?
         </span>
       </div>
 
-      {/* Chip list */}
-      <div
-        id={listId}
-        className="flex flex-wrap justify-center gap-2"
-      >
-        {visible.map((venue) =>
+      {/* Chip list — teaser only */}
+      <div className="flex flex-wrap justify-center gap-2">
+        {teaser.map((venue) =>
           venue.url ? (
             <a
               key={venue.name}
@@ -122,25 +114,20 @@ export default function SupportedVenues({ venues = SUPPORTED_VENUES }: { venues?
               {venue.name}
             </a>
           ) : (
-            <span
-              key={venue.name}
-              className={`${chipBase} text-muted`}
-            >
+            <span key={venue.name} className={`${chipBase} text-muted`}>
               {venue.name}
             </span>
           )
         )}
 
-        {/* Expand / collapse toggle */}
-        {hidden > 0 && (
-          <button
-            onClick={() => setExpanded((e) => !e)}
-            aria-expanded={expanded}
-            aria-controls={listId}
-            className={`${chipBase} text-muted hover:bg-white/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-background cursor-pointer`}
+        {/* "View full list" link chip */}
+        {hiddenCount > 0 && (
+          <Link
+            href="/venues"
+            className={`${chipBase} text-muted hover:bg-white/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-background`}
           >
-            {expanded ? "Show less" : `+${hidden} more`}
-          </button>
+            +{hiddenCount} more →
+          </Link>
         )}
       </div>
     </div>
