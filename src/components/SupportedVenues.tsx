@@ -69,6 +69,9 @@ export const SUPPORTED_VENUES: Venue[] = [
   { name: "Everyman Screen on the Green",     url: "https://www.everymancinema.com/screen-on-the-green" },
   { name: "Everyman Stratford International", url: "https://www.everymancinema.com/stratford-international" },
   { name: "Everyman The Whiteley",            url: "https://www.everymancinema.com/the-whiteley" },
+  { name: "Ciné Lumière",    url: "https://www.institut-francais.org.uk/cine-lumiere/" },
+  { name: "The Arzner",      url: "https://thearzner.com" },
+  { name: "The Nickel",      url: "https://thenickel.co.uk" },
 ];
 
 const CLAMP = 10;
