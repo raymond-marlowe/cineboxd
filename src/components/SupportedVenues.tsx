@@ -75,6 +75,10 @@ export const SUPPORTED_VENUES: Venue[] = [
   { name: "The Castle Cinema",               url: "https://thecastlecinema.com" },
   { name: "Coldharbour Blue / Whirled Cinema", url: "https://www.coldharbourblue.com" },
   { name: "Peckhamplex",                     url: "https://www.peckhamplex.london" },
+  { name: "Olympic Cinema (Barnes)",         url: "https://www.olympiccinema.com/whats-on" },
+  { name: "The Cinema in the Power Station", url: "https://www.thecinemainthepowerstation.com/whats-on" },
+  { name: "The Cinema at Selfridges",        url: "https://www.thecinemaatselfridges.com/whats-on" },
+  { name: "Chiswick Cinema",                 url: "https://www.chiswickcinema.co.uk/whats-on" },
 ];
 
 const CLAMP = 10;

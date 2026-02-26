@@ -54,6 +54,10 @@ export const VENUE_COORDS: Record<string, VenueCoords> = {
   "The Castle Cinema":     { lat: 51.5502, lng: -0.0565 }, // 64-66 Brooksby's Walk, Hackney, E9 6DA
   "Coldharbour Blue / Whirled Cinema": { lat: 51.4643, lng: -0.1100 }, // Hardess Street, Loughborough Junction, SE24 0HJ
   "Peckhamplex":           { lat: 51.4713, lng: -0.0688 }, // 95A Rye Lane, Peckham, SE15 4ST
+  "Olympic Cinema (Barnes)": { lat: 51.4719, lng: -0.2526 }, // 117-123 Church Rd, Barnes, SW13 9HL
+  "The Cinema in the Power Station": { lat: 51.4810, lng: -0.1449 }, // Circus Rd W, Battersea Power Station, SW11 8DD
+  "The Cinema at Selfridges": { lat: 51.5144, lng: -0.1520 }, // 400 Oxford St, W1A 1AB
+  "Chiswick Cinema":       { lat: 51.4921, lng: -0.2668 }, // 94-96 Chiswick High Rd, W4 1SH
   // Everyman venues (ENABLE_EVERYMAN scraper)
   "Everyman Baker Street":          { lat: 51.5225, lng: -0.1573 }, // 96-98 Baker St, W1U 6TJ
   "Everyman Barnet":                { lat: 51.6479, lng: -0.2063 }, // The Spires, High St, EN5 5XY
