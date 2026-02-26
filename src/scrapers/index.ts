@@ -32,7 +32,43 @@ export type Scraper = () => Promise<Screening[]>;
 export interface ScrapeBreakdown {
   name: string;
   count: number;
+  durationMs: number;
   error?: string;
+  sample?: string; // first title seen — quick sanity-check in prod responses
+}
+
+// Hard ceiling per scraper: prevents a single hung scraper (e.g. olympic-cinema
+// crawling 600 URLs, chiswick fetching 60 movie pages) from keeping the Vercel
+// function alive past its platform timeout and blocking the Redis write.
+const SCRAPER_TIMEOUT_MS = 25_000;
+
+/**
+ * Runs a scraper with a hard timeout.  Never rejects — errors are returned
+ * as { screenings: [], error } so Promise.all on the outer loop is safe.
+ */
+async function runWithTimeout(
+  fn: Scraper,
+  timeoutMs: number
+): Promise<{ screenings: Screening[]; durationMs: number; error?: string }> {
+  const start = Date.now();
+  try {
+    const screenings = await Promise.race<Screening[]>([
+      fn(),
+      new Promise<Screening[]>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`timed out after ${timeoutMs}ms`)),
+          timeoutMs
+        )
+      ),
+    ]);
+    return { screenings, durationMs: Date.now() - start };
+  } catch (err) {
+    return {
+      screenings: [],
+      durationMs: Date.now() - start,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 const namedScrapers: { name: string; fn: Scraper }[] = [
@@ -69,20 +105,29 @@ const namedScrapers: { name: string; fn: Scraper }[] = [
 export const scrapers: Scraper[] = namedScrapers.map((s) => s.fn);
 
 export async function scrapeAllWithBreakdown(): Promise<{ screenings: Screening[]; breakdown: ScrapeBreakdown[] }> {
-  const results = await Promise.allSettled(namedScrapers.map((s) => s.fn()));
+  // All scrapers run concurrently; each is individually capped at SCRAPER_TIMEOUT_MS
+  // so the overall wall time ≤ SCRAPER_TIMEOUT_MS regardless of scraper count.
+  // runWithTimeout never rejects, so Promise.all is safe here.
+  const results = await Promise.all(
+    namedScrapers.map(({ fn }) => runWithTimeout(fn, SCRAPER_TIMEOUT_MS))
+  );
+
   const breakdown: ScrapeBreakdown[] = [];
   const screenings: Screening[] = [];
+
   for (let i = 0; i < results.length; i++) {
-    const r = results[i];
+    const { screenings: scraped, durationMs, error } = results[i];
     const { name } = namedScrapers[i];
-    if (r.status === "fulfilled") {
-      breakdown.push({ name, count: r.value.length });
-      screenings.push(...r.value);
-    } else {
-      const error = r.reason instanceof Error ? r.reason.message : String(r.reason);
-      breakdown.push({ name, count: 0, error });
-    }
+    breakdown.push({
+      name,
+      count: scraped.length,
+      durationMs,
+      ...(error ? { error } : {}),
+      ...(scraped[0] ? { sample: scraped[0].title } : {}),
+    });
+    screenings.push(...scraped);
   }
+
   return { screenings, breakdown };
 }
 
