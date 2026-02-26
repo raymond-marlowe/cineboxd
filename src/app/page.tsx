@@ -6,6 +6,7 @@ import { MatchedScreening, Screening } from "@/lib/types";
 import { generateIcsEvent, generateIcsFile, downloadIcs } from "@/lib/ics";
 import dynamic from "next/dynamic";
 import Calendar from "@/components/calendar";
+import FilmGrid from "@/components/FilmGrid";
 import SupportedVenues from "@/components/SupportedVenues";
 const VenueMap = dynamic(() => import("@/components/venue-map"), { ssr: false });
 import {
@@ -26,7 +27,7 @@ interface MatchResponse {
 }
 
 type AppState = "upload" | "loading" | "results";
-type ViewMode = "list" | "calendar" | "map";
+type ViewMode = "list" | "grid" | "calendar" | "map";
 type InputMode = "solo" | "together";
 
 const USER_COLORS = ["#f59e0b", "#3b82f6", "#10b981", "#8b5cf6", "#ef4444"];
@@ -215,7 +216,9 @@ function HomeInner() {
 
     // Restore view + venue filter from URL
     const viewParam = searchParams.get("view");
-    if (viewParam === "calendar" || viewParam === "map") setViewMode(viewParam as ViewMode);
+    if (viewParam === "grid" || viewParam === "calendar" || viewParam === "map") {
+      setViewMode(viewParam as ViewMode);
+    }
     const venueParam = searchParams.get("venue");
     if (venueParam) setVenueFilter(venueParam);
     // Only run on mount
@@ -231,6 +234,15 @@ function HomeInner() {
     const qs = params.toString();
     window.history.replaceState(null, "", window.location.pathname + (qs ? "?" + qs : ""));
   }, [viewMode, venueFilter, state]);
+
+  useEffect(() => {
+    if (!drawerMatch) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrawerMatch(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [drawerMatch]);
 
   // Restore saved postcode from localStorage on mount
   useEffect(() => {
@@ -739,6 +751,54 @@ function HomeInner() {
     );
   };
 
+  const renderFilmBadges = (match: MatchedScreening) => {
+    const meta = match.metadata;
+    if (
+      !meta?.imdbId &&
+      meta?.tmdbRating == null &&
+      !match.film.letterboxdUri
+    ) {
+      return null;
+    }
+    return (
+      <div className="flex items-center gap-3 mt-2 flex-wrap">
+        {meta?.tmdbRating != null && (
+          <span
+            className={`text-xs font-bold px-2 py-0.5 rounded ${
+              meta.tmdbRating >= 7
+                ? "bg-green-500/20 text-green-400"
+                : meta.tmdbRating >= 5
+                  ? "bg-yellow-500/20 text-yellow-400"
+                  : "bg-red-500/20 text-red-400"
+            }`}
+          >
+            TMDB {meta.tmdbRating.toFixed(1)}
+          </span>
+        )}
+        {meta?.imdbId && (
+          <a
+            href={`https://www.imdb.com/title/${meta.imdbId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-bold bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded hover:bg-yellow-500/30 transition-colors"
+          >
+            IMDb
+          </a>
+        )}
+        {match.film.letterboxdUri && (
+          <a
+            href={match.film.letterboxdUri}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded hover:bg-emerald-500/30 transition-colors"
+          >
+            Letterboxd
+          </a>
+        )}
+      </div>
+    );
+  };
+
   const renderFilmCard = (match: MatchedScreening, index: number) => {
     const meta = match.metadata;
     const PREVIEW_COUNT = 3;
@@ -788,41 +848,7 @@ function HomeInner() {
               </p>
             )}
 
-            <div className="flex items-center gap-3 mt-2 flex-wrap">
-              {meta?.tmdbRating != null && (
-                <span
-                  className={`text-xs font-bold px-2 py-0.5 rounded ${
-                    meta.tmdbRating >= 7
-                      ? "bg-green-500/20 text-green-400"
-                      : meta.tmdbRating >= 5
-                        ? "bg-yellow-500/20 text-yellow-400"
-                        : "bg-red-500/20 text-red-400"
-                  }`}
-                >
-                  TMDB {meta.tmdbRating.toFixed(1)}
-                </span>
-              )}
-              {meta?.imdbId && (
-                <a
-                  href={`https://www.imdb.com/title/${meta.imdbId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-bold bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded hover:bg-yellow-500/30 transition-colors"
-                >
-                  IMDb
-                </a>
-              )}
-              {match.film.letterboxdUri && (
-                <a
-                  href={match.film.letterboxdUri}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded hover:bg-emerald-500/30 transition-colors"
-                >
-                  Letterboxd
-                </a>
-              )}
-            </div>
+            {renderFilmBadges(match)}
           </div>
         </div>
 
@@ -847,6 +873,7 @@ function HomeInner() {
 
   const renderDrawer = () => {
     if (!drawerMatch) return null;
+    const meta = drawerMatch.metadata;
     const allScreenings = getSortedScreenings(drawerMatch.screenings);
     // Group by venue, within each venue sort by time ascending
     const venueMap = new Map<string, Screening[]>();
@@ -877,7 +904,14 @@ function HomeInner() {
         <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-card border-l border-border flex flex-col shadow-2xl">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
             <div>
-              <h2 className="font-semibold text-base">{drawerMatch.film.title}</h2>
+              <h2 className="font-semibold text-base">
+                {drawerMatch.film.title}
+                {drawerMatch.film.year && (
+                  <span className="text-sm text-muted font-normal ml-2">
+                    ({drawerMatch.film.year})
+                  </span>
+                )}
+              </h2>
               <p className="text-sm text-muted">{allScreenings.length} screenings</p>
             </div>
             <button
@@ -891,7 +925,36 @@ function HomeInner() {
               </svg>
             </button>
           </div>
-          <div className="overflow-y-auto flex-1 px-4 py-3 space-y-2">
+          <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3">
+            <div className="bg-background/40 border border-border rounded-lg p-3">
+              <div className="flex gap-3">
+                {meta?.posterPath ? (
+                  <img
+                    src={`https://image.tmdb.org/t/p/w185${meta.posterPath}`}
+                    alt={`${drawerMatch.film.title} poster`}
+                    className="w-20 aspect-[2/3] object-cover rounded-lg shrink-0"
+                  />
+                ) : (
+                  <div className="w-20 aspect-[2/3] bg-background/50 rounded-lg shrink-0 flex items-center justify-center text-muted text-xs text-center px-2">
+                    No poster
+                  </div>
+                )}
+                <div className="min-w-0">
+                  {renderUserDots(drawerMatch.users)}
+                  {meta?.director && (
+                    <p className="text-sm text-muted mt-0.5">
+                      Directed by {meta.director}
+                    </p>
+                  )}
+                  {meta?.overview && (
+                    <p className="text-sm text-muted mt-1.5">
+                      {meta.overview}
+                    </p>
+                  )}
+                  {renderFilmBadges(drawerMatch)}
+                </div>
+              </div>
+            </div>
             {venueNames.map((venue) => {
               const screenings = venueMap.get(venue)!.sort((a, b) =>
                 (a.date + a.time).localeCompare(b.date + b.time)
@@ -1197,6 +1260,16 @@ function HomeInner() {
                         List
                       </button>
                       <button
+                        onClick={() => setViewMode("grid")}
+                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
+                          viewMode === "grid"
+                            ? "bg-accent text-background font-medium"
+                            : "bg-card text-muted hover:text-foreground"
+                        }`}
+                      >
+                        Grid
+                      </button>
+                      <button
                         onClick={() => setViewMode("calendar")}
                         className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
                           viewMode === "calendar"
@@ -1269,6 +1342,63 @@ function HomeInner() {
                     maxDistanceMiles={maxDistanceMiles}
                     onVenueSelect={(v) => { setVenueFilter(v); setViewMode("list"); }}
                   />
+                ) : viewMode === "grid" ? (
+                  <>
+                    {filteredShared && filteredShared.length > 0 ? (
+                      <FilmGrid
+                        matches={filteredShared}
+                        onSelectFilm={(match) => {
+                          setDrawerMatch(match);
+                          setDrawerVenueExpanded({});
+                        }}
+                      />
+                    ) : (
+                      <div className="text-center py-8 text-muted">
+                        <p className="text-lg">No shared films found</p>
+                        <p className="text-sm mt-2">
+                          No films appear on all watchlists and are currently screening.
+                        </p>
+                      </div>
+                    )}
+
+                    {filteredPartial && filteredPartial.length > 0 && (
+                      <div className="border border-border rounded-xl overflow-hidden">
+                        <button
+                          onClick={() => setPartialExpanded(!partialExpanded)}
+                          className="w-full flex items-center justify-between px-5 py-4 bg-card hover:bg-card-hover transition-colors cursor-pointer"
+                        >
+                          <span className="font-medium">
+                            On some watchlists ({filteredPartial.length})
+                          </span>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className={`transition-transform ${partialExpanded ? "rotate-180" : ""}`}
+                          >
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </button>
+                        {partialExpanded && (
+                          <div className="p-4">
+                            <FilmGrid
+                              matches={filteredPartial}
+                              onSelectFilm={(match) => {
+                                setDrawerMatch(match);
+                                setDrawerVenueExpanded({});
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <>
                     {/* Shared films */}
@@ -1361,6 +1491,16 @@ function HomeInner() {
                         }`}
                       >
                         List
+                      </button>
+                      <button
+                        onClick={() => setViewMode("grid")}
+                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
+                          viewMode === "grid"
+                            ? "bg-accent text-background font-medium"
+                            : "bg-card text-muted hover:text-foreground"
+                        }`}
+                      >
+                        Grid
                       </button>
                       <button
                         onClick={() => setViewMode("calendar")}
@@ -1499,6 +1639,23 @@ function HomeInner() {
                     maxDistanceMiles={maxDistanceMiles}
                     onVenueSelect={(v) => { setVenueFilter(v); setViewMode("list"); }}
                   />
+                ) : viewMode === "grid" ? (
+                  filteredMatches && filteredMatches.length > 0 ? (
+                    <FilmGrid
+                      matches={filteredMatches}
+                      onSelectFilm={(match) => {
+                        setDrawerMatch(match);
+                        setDrawerVenueExpanded({});
+                      }}
+                    />
+                  ) : (
+                    <div className="text-center py-16 text-muted">
+                      <p className="text-lg">No matches found</p>
+                      <p className="text-sm mt-2">
+                        None of your watchlist films are currently screening.
+                      </p>
+                    </div>
+                  )
                 ) : filteredMatches && filteredMatches.length > 0 ? (
                   <div className="grid gap-4">
                     {filteredMatches.map((match, i) => renderFilmCard(match, i))}
