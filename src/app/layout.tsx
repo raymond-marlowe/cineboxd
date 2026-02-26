@@ -30,16 +30,16 @@ export default function RootLayout({
       >
         {children}
         <footer className="border-t border-border mt-auto">
-          <div className="max-w-4xl mx-auto px-4 py-6 text-center text-sm text-muted">
-            <p>
-              Made by Alexander Nikolov{" "}
-              <span className="mx-1">&middot;</span>{" "}
-              <a href="/about" className="text-accent hover:underline">
-                About
-              </a>{" "}
-              <span className="mx-1">&middot;</span>{" "}
-              Screening data may be inaccurate — always check the venue before
-              booking
+          <div className="max-w-4xl mx-auto px-4 py-6 text-center flex flex-col gap-1">
+            <p className="text-sm font-medium text-foreground/80">
+              Screening data may be inaccurate — always check the venue before booking
+            </p>
+            <p className="text-xs text-muted">
+              Made by Alexander Nikolov
+              <span className="mx-1.5">&middot;</span>
+              <a href="/about" className="hover:underline">About</a>
+              <span className="mx-1.5">&middot;</span>
+              <a href="/venues" className="hover:underline">Supported venues</a>
             </p>
           </div>
         </footer>
