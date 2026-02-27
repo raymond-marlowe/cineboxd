@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import Wordmark from "@/components/Wordmark";
 
 const NAV_LINKS = [
   { label: "Watchlist",  href: "/" },
@@ -27,11 +28,8 @@ function TopNavInner() {
   return (
     <nav className="border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-40">
       <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center gap-2 sm:gap-6">
-        <Link
-          href="/"
-          className="text-base font-bold tracking-tight shrink-0 mr-2"
-        >
-          <span className="text-accent">cine</span>boxd
+        <Link href="/" className="shrink-0 mr-2 leading-none" aria-label="Cineboxd home">
+          <Wordmark className="text-xl" />
         </Link>
 
         <div className="flex items-center gap-0.5 overflow-x-auto">
