@@ -29,7 +29,7 @@ function TopNavInner() {
     <nav className="border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-40">
       <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center gap-2 sm:gap-6">
         <Link href="/" className="shrink-0 mr-2 leading-none" aria-label="Cineboxd home">
-          <Wordmark className="text-xl" />
+          <Wordmark className="text-xl sm:text-2xl" />
         </Link>
 
         <div className="flex items-center gap-0.5 overflow-x-auto">
