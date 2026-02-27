@@ -53,6 +53,10 @@ export default function RootLayout({
               <a href="/venues" className="hover:underline">
                 Supported venues
               </a>
+              <span className="mx-1.5">&middot;</span>
+              <a href="/privacy" className="hover:underline">
+                Privacy
+              </a>
             </p>
           </div>
         </footer>
