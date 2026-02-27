@@ -19,10 +19,10 @@ export const metadata: Metadata = {
     "Find your Letterboxd watchlist films screening at London repertory cinemas",
   icons: {
     icon: [
-      { url: "/favicon.ico" }, // classic
-      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" }, // optional but nice
+      { url: "/favicon.ico" },
+      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
     ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }], // optional
   },
 };
 
