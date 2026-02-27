@@ -272,12 +272,6 @@ function HomeInner() {
       handleUsername(userParam);
     }
 
-    // Init input mode from URL (?mode=together with no other data params)
-    const inputModeParam = searchParams.get("mode");
-    if (inputModeParam === "together" && !userParam && !usersParam && !listParam) {
-      setMode("together");
-    }
-
     // Restore view + venue filter from URL
     const viewParam = searchParams.get("view");
     if (viewParam === "grid" || viewParam === "calendar" || viewParam === "map") {
@@ -308,6 +302,17 @@ function HomeInner() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [drawerMatch]);
+
+  // Sync Together/Solo tab with URL — handles both initial render and TopNav SPA navigation.
+  // Only applies when not showing results; skips when data params drive the mode.
+  useEffect(() => {
+    if (state !== "upload") return;
+    const hasDataParam =
+      searchParams.get("users") || searchParams.get("user") || searchParams.get("list");
+    if (!hasDataParam) {
+      setMode(searchParams.get("mode") === "together" ? "together" : "solo");
+    }
+  }, [searchParams, state]);
 
   // Restore saved postcode from localStorage on mount
   useEffect(() => {

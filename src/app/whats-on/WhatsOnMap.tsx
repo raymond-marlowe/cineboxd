@@ -5,38 +5,8 @@ import L from "leaflet";
 import { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import { VENUE_COORDS, formatDistance } from "@/lib/venues";
+import { DARK_POPUP_CSS } from "@/lib/leaflet-popup-css";
 import type { VenueGroup } from "./WhatsOnClient";
-
-// ── Dark theme for Leaflet popups ─────────────────────────────────────────────
-
-const DARK_POPUP_CSS = `
-  .leaflet-popup-content-wrapper {
-    background: #18181b !important;
-    border: 1px solid #27272a !important;
-    border-radius: 8px !important;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.6) !important;
-    color: #e5e7eb !important;
-    padding: 0 !important;
-  }
-  .leaflet-popup-tip {
-    background: #18181b !important;
-  }
-  .leaflet-popup-content {
-    margin: 10px 14px !important;
-    color: #e5e7eb !important;
-  }
-  .leaflet-popup-close-button {
-    color: #71717a !important;
-    font-size: 16px !important;
-    right: 8px !important;
-    top: 6px !important;
-    padding: 0 !important;
-  }
-  .leaflet-popup-close-button:hover {
-    color: #e5e7eb !important;
-    background: transparent !important;
-  }
-`;
 
 // ── Marker icon ───────────────────────────────────────────────────────────────
 
@@ -93,13 +63,7 @@ export default function WhatsOnMap({
   const positions: [number, number][] = pins.map((p) => [p.coords.lat, p.coords.lng]);
 
   return (
-    <div
-      style={{
-        width: "100%",
-        height: "clamp(400px, 65vh, 720px)",
-      }}
-      className="rounded-lg overflow-hidden border border-border"
-    >
+    <div className="w-full h-[520px] md:h-[640px] rounded-lg overflow-hidden border border-white/10">
       <MapContainer
         center={[51.51, -0.12]}
         zoom={11}

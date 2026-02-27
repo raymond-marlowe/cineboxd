@@ -326,6 +326,7 @@ export default function WhatsOnClient({ screenings }: { screenings: Screening[] 
     "bg-card border border-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none focus:border-accent transition-colors";
 
   return (
+    <div className="flex-1">
     <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       {/* ── Title ── */}
       <div>
@@ -452,15 +453,15 @@ export default function WhatsOnClient({ screenings }: { screenings: Screening[] 
               No screenings found for the selected period.
             </p>
           ) : (
-            <div className="space-y-6">
+            <div className="w-full rounded-2xl border border-white/10 bg-black/20 overflow-hidden divide-y divide-white/10">
               {calendarData.map(({ date, venues }) => {
                 const venueNames = venues.map(([v]) => v);
                 const totalScreenings = venues.reduce((acc, [, vs]) => acc + vs.length, 0);
 
                 return (
-                  <section key={date}>
+                  <section key={date} className="p-4 sm:p-5">
                     {/* Date header row */}
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-baseline gap-2">
                         <h2 className="text-sm font-semibold text-foreground">
                           {fmtDateLong(date)}
@@ -487,7 +488,7 @@ export default function WhatsOnClient({ screenings }: { screenings: Screening[] 
                     </div>
 
                     {/* Venue accordion */}
-                    <div className="divide-y divide-border border border-border rounded-lg overflow-hidden">
+                    <div className="divide-y divide-border rounded-lg overflow-hidden border border-border/50">
                       {venues.map(([venue, vs]) => {
                         const key = `${date}__${venue}`;
                         const isExpanded = expandedVenues.has(key);
@@ -594,6 +595,7 @@ export default function WhatsOnClient({ screenings }: { screenings: Screening[] 
         {desc}.
       </p>
     </main>
+    </div>
   );
 }
 

@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
 import { redis, SCREENINGS_KEY } from "@/lib/redis";
 import { Screening } from "@/lib/types";
 import { slugToVenueName } from "@/lib/venue-slug";
+import { fetchFilmMetadata } from "@/lib/tmdb";
 import VenueDistanceBadge from "./VenueDistanceBadge";
 
 // ── Metadata ──────────────────────────────────────────────────────────────────
@@ -59,9 +61,27 @@ export default async function VenuePage({
   }
   const dates = [...byDate.keys()];
 
+  // Fetch TMDB posters for the first 30 unique titles
+  const seen = new Set<string>();
+  const uniqueTitles: { title: string; year: number | null }[] = [];
+  for (const s of screenings) {
+    if (!seen.has(s.title) && uniqueTitles.length < 30) {
+      seen.add(s.title);
+      uniqueTitles.push({ title: s.title, year: s.year });
+    }
+  }
+  const metadataList = await Promise.all(
+    uniqueTitles.map(({ title, year }) => fetchFilmMetadata(title, year))
+  );
+  const posterMap: Record<string, string> = {};
+  for (let i = 0; i < uniqueTitles.length; i++) {
+    const path = metadataList[i].posterPath;
+    if (path) posterMap[uniqueTitles[i].title] = path;
+  }
+
   return (
     <div className="flex-1">
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         {/* ── Header ── */}
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -95,6 +115,19 @@ export default async function VenuePage({
                     >
                       <span className="w-11 shrink-0 tabular-nums text-muted text-xs">
                         {s.time}
+                      </span>
+                      <span className="shrink-0 w-5 flex items-center">
+                        {posterMap[s.title] ? (
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w92${posterMap[s.title]}`}
+                            alt=""
+                            width={20}
+                            height={30}
+                            className="rounded-sm object-cover"
+                          />
+                        ) : (
+                          <span className="inline-block w-5 h-[30px] rounded-sm bg-white/5" />
+                        )}
                       </span>
                       <span className="flex-1 text-foreground leading-snug">
                         {s.title}
