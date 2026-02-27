@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import SupportCard from "@/components/SupportCard";
 
 export const metadata: Metadata = {
   title: "About — Cineboxd",
@@ -24,6 +25,8 @@ export default function AboutPage() {
             Uploaded watchlist files are processed in memory and not stored.
           </p>
         </div>
+
+        <SupportCard />
 
         <Link
           href="/"

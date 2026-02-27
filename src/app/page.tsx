@@ -10,6 +10,7 @@ import dynamic from "next/dynamic";
 import Calendar from "@/components/calendar";
 import FilmGrid from "@/components/FilmGrid";
 import SupportedVenues from "@/components/SupportedVenues";
+import SupportCard from "@/components/SupportCard";
 const VenueMap = dynamic(() => import("@/components/venue-map"), { ssr: false });
 import {
   VENUE_COORDS,
@@ -1746,6 +1747,8 @@ function HomeInner() {
                 )}
               </>
             )}
+
+            <SupportCard compact />
           </div>
         )}
       </main>
