@@ -17,6 +17,13 @@ export const metadata: Metadata = {
   title: "Cineboxd",
   description:
     "Find your Letterboxd watchlist films screening at London repertory cinemas",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" }, // classic
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" }, // optional but nice
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }], // optional
+  },
 };
 
 export default function RootLayout({
@@ -39,9 +46,13 @@ export default function RootLayout({
             <p className="text-xs text-muted">
               Made by Alexander Nikolov
               <span className="mx-1.5">&middot;</span>
-              <a href="/about" className="hover:underline">About</a>
+              <a href="/about" className="hover:underline">
+                About
+              </a>
               <span className="mx-1.5">&middot;</span>
-              <a href="/venues" className="hover:underline">Supported venues</a>
+              <a href="/venues" className="hover:underline">
+                Supported venues
+              </a>
             </p>
           </div>
         </footer>
