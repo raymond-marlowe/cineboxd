@@ -25,7 +25,7 @@ export default function Wordmark({ className }: { className?: string }) {
     <span className={`leading-none select-none${className ? ` ${className}` : ""}`}>
       <span className={crimsonItalic.className} style={{ color: "#C9772B" }}>cine</span>
       <span
-        className={`${crimsonRoman.className} -ml-[0.04em] tracking-[-0.015em]`}
+        className={`${crimsonRoman.className} -ml-[0.03em] tracking-[-0.015em]`}
         style={{ color: "#F2F0EB" }}
       >
         boxd
