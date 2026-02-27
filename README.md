@@ -36,7 +36,9 @@ For the screenings cache (optional but recommended in production), set `KV_REST_
 - **Three views** — list view with film cards, monthly calendar view, or interactive map view
 - **Venue filtering** — filter results by cinema
 - **Location filtering** — enter a UK postcode to filter and sort by distance
-- **Venues directory** — `/venues` lists all 27+ supported cinemas with search, A–Z / by-chain sort, and a Leaflet map view showing all venue pins
+- **What's On** — `/whats-on` browses all upcoming screenings across every venue, filterable by date scope (today / tomorrow / weekend / 7 days / custom), sortable by distance or name, with list, calendar accordion, and map views
+- **Venue pages** — `/venues/[slug]` shows all upcoming screenings at a specific cinema, grouped by date, with TMDB poster thumbnails and a distance badge
+- **Venues directory** — `/venues` lists all supported cinemas with search, A–Z / by-chain sort, venue links, and a Leaflet map view
 
 ## Architecture
 
@@ -60,4 +62,4 @@ Set up a daily cron job to call `POST /api/refresh-screenings` with `Authorizati
 
 ## Built with
 
-Next.js, React, Tailwind CSS, Cheerio, Fuse.js, TMDB API, Upstash Redis, Leaflet.
+Next.js, React, Tailwind CSS, Crimson Pro (next/font/google), Cheerio, Fuse.js, TMDB API, Upstash Redis, Leaflet.

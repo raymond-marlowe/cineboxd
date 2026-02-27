@@ -20,6 +20,7 @@ Cineboxd is a web app that checks whether any films on your Letterboxd watchlist
 | [Leaflet](https://leafletjs.com) / [react-leaflet](https://react-leaflet.js.org) | ^4 | Interactive map library — powers the Map view showing screening venues as pins. |
 | [Vercel](https://vercel.com) | — | The hosting platform where the app runs in production. |
 | [Geist](https://vercel.com/font) | — | The font used throughout the interface (loaded via `next/font`). |
+| [Crimson Pro](https://fonts.google.com/specimen/Crimson+Pro) | — | Display typeface used for the wordmark (`Wordmark.tsx`), loaded via `next/font/google`. |
 
 ## 3. Project Structure
 
@@ -33,16 +34,27 @@ cineboxd/
 │   │   │   └── refresh-screenings/
 │   │   │       └── route.ts          # GET/POST /api/refresh-screenings — cache health + scrape trigger
 │   │   ├── about/
-│   │   │   └── page.tsx              # /about — static about page
+│   │   │   └── page.tsx              # /about — static about page + support CTA
 │   │   ├── venues/
-│   │   │   └── page.tsx              # /venues — supported cinemas directory (static, prerendered)
+│   │   │   ├── page.tsx              # /venues — supported cinemas directory (static, prerendered)
+│   │   │   └── [slug]/
+│   │   │       ├── page.tsx          # /venues/[slug] — single venue: screenings by date + TMDB posters
+│   │   │       └── VenueDistanceBadge.tsx  # Client component: postcode → distance badge (postcodes.io)
+│   │   ├── whats-on/
+│   │   │   ├── page.tsx              # /whats-on — server shell (reads Redis, passes to client)
+│   │   │   ├── WhatsOnClient.tsx     # Client: date scope, sort, list/calendar/map views, postcode
+│   │   │   └── WhatsOnMap.tsx        # Client: Leaflet map for What's On (dynamic import, ssr:false)
 │   │   ├── globals.css               # CSS custom properties (colors, fonts, Leaflet overrides)
-│   │   ├── layout.tsx                # Root HTML layout, metadata, footer
+│   │   ├── layout.tsx                # Root HTML layout, TopNav, footer, metadata
 │   │   └── page.tsx                  # / — main page (input, results, calendar, map)
 │   │
 │   ├── components/
 │   │   ├── calendar.tsx              # Monthly calendar view for screenings
 │   │   ├── FilmGrid.tsx              # Condensed grid view for results
+│   │   ├── TopNav.tsx                # Sticky global nav with Wordmark + page links (client, useSearchParams)
+│   │   ├── Wordmark.tsx              # "cineboxd" wordmark — Crimson Pro Black italic+roman, split colour
+│   │   ├── SupportCard.tsx           # Tip-jar CTA (Stripe + Ko-fi); compact prop for results placement
+│   │   ├── RequestCinemaCTA.tsx      # "Suggest a cinema" CTA linking to Google Form
 │   │   ├── venue-map.tsx             # Interactive Leaflet map view for results page (react-leaflet)
 │   │   ├── venues-directory-map.tsx  # Leaflet map showing all supported venue pins (/venues)
 │   │   ├── SupportedVenues.tsx       # Homepage teaser chip strip (first 10 venues + "View full list →")
@@ -59,7 +71,10 @@ cineboxd/
 │   │   ├── rate-limit.ts             # In-memory sliding-window rate limiter (10 req/60s per IP)
 │   │   ├── ics.ts                    # Generates ICS calendar files for screenings
 │   │   ├── subscriptions.ts          # JSON-file subscription store (read/write/add/remove)
-│   │   └── venues.ts                 # Hardcoded venue coordinates + Haversine distance utilities
+│   │   ├── venues.ts                 # Hardcoded venue coordinates + Haversine distance utilities
+│   │   ├── venue-slug.ts             # Bidirectional venue name ↔ URL slug mapping
+│   │   ├── leaflet-popup-css.ts      # Shared dark-theme CSS string injected by map components
+│   │   └── constants.ts              # Site-wide constants (SUPPORT_STRIPE_URL, SUPPORT_KOFI_URL)
 │   │
 │   └── scrapers/                     # Cinema listing scrapers (27 defined; 3 flag-gated, 1 disabled)
 │       ├── index.ts                  # Runs all scrapers concurrently with per-scraper timeout, returns breakdown
