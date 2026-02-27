@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import SupportCard from "@/components/SupportCard";
 
 export const metadata: Metadata = {
   title: "About — Cineboxd",
@@ -8,17 +9,7 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <div className="flex-1">
-      <header className="border-b border-border">
-        <div className="max-w-4xl mx-auto px-4 py-6 flex items-center justify-between">
-          <Link href="/">
-            <h1 className="text-2xl font-bold tracking-tight">
-              <span className="text-accent">cine</span>boxd
-            </h1>
-          </Link>
-        </div>
-      </header>
-
-      <main className="max-w-2xl mx-auto px-4 py-12 space-y-6">
+      <main className="max-w-4xl mx-auto px-4 py-12 space-y-6">
         <h2 className="text-3xl font-semibold tracking-tight">About</h2>
 
         <div className="space-y-4 text-muted leading-relaxed">
@@ -35,6 +26,8 @@ export default function AboutPage() {
           </p>
         </div>
 
+        <SupportCard />
+
         <Link
           href="/"
           className="inline-block text-accent hover:underline text-sm"
@@ -45,3 +38,4 @@ export default function AboutPage() {
     </div>
   );
 }
+

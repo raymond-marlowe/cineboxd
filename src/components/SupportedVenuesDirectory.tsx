@@ -2,8 +2,10 @@
 
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { SUPPORTED_VENUES, Venue } from "./SupportedVenues";
 import { VENUE_COORDS } from "@/lib/venues";
+import { venueNameToSlug } from "@/lib/venue-slug";
 import type { VenuePin } from "./venues-directory-map";
 
 const VenuesDirectoryMap = dynamic(
@@ -44,7 +46,12 @@ function VenueList({ venues }: { venues: EnrichedVenue[] }) {
     <ul className="divide-y divide-border">
       {venues.map((venue) => (
         <li key={venue.name} className="flex items-center justify-between gap-4 py-3">
-          <span className="text-sm font-medium">{venue.name}</span>
+          <Link
+            href={`/venues/${venueNameToSlug(venue.name)}`}
+            className="text-sm font-medium hover:text-accent transition-colors"
+          >
+            {venue.name}
+          </Link>
           {venue.url ? (
             <a
               href={venue.url}

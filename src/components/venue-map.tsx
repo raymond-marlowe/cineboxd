@@ -12,6 +12,7 @@ import {
   useMap,
 } from "react-leaflet";
 import { VENUE_COORDS } from "@/lib/venues";
+import { DARK_POPUP_CSS } from "@/lib/leaflet-popup-css";
 import { MatchedScreening } from "@/lib/types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -103,6 +104,16 @@ export default function VenueMap({
   maxDistanceMiles,
   onVenueSelect,
 }: VenueMapProps) {
+  // Inject dark popup CSS
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = DARK_POPUP_CSS;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   // Build per-venue summary from the currently-filtered matches
   const venueSummaries = useMemo<VenueSummary[]>(() => {
     const venueMap = new Map<string, { films: Map<string, TopFilm>; screeningsCount: number }>();

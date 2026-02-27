@@ -2,12 +2,15 @@
 
 import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { MatchedScreening, Screening } from "@/lib/types";
+import { venueNameToSlug } from "@/lib/venue-slug";
 import { generateIcsEvent, generateIcsFile, downloadIcs } from "@/lib/ics";
 import dynamic from "next/dynamic";
 import Calendar from "@/components/calendar";
 import FilmGrid from "@/components/FilmGrid";
 import SupportedVenues from "@/components/SupportedVenues";
+import SupportCard from "@/components/SupportCard";
 const VenueMap = dynamic(() => import("@/components/venue-map"), { ssr: false });
 import {
   VENUE_COORDS,
@@ -301,6 +304,17 @@ function HomeInner() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [drawerMatch]);
 
+  // Sync Together/Solo tab with URL — handles both initial render and TopNav SPA navigation.
+  // Only applies when not showing results; skips when data params drive the mode.
+  useEffect(() => {
+    if (state !== "upload") return;
+    const hasDataParam =
+      searchParams.get("users") || searchParams.get("user") || searchParams.get("list");
+    if (!hasDataParam) {
+      setMode(searchParams.get("mode") === "together" ? "together" : "solo");
+    }
+  }, [searchParams, state]);
+
   // Restore saved postcode from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem("cineboxd_postcode");
@@ -381,6 +395,11 @@ function HomeInner() {
   const switchMode = (newMode: InputMode) => {
     setMode(newMode);
     setError(null);
+    if (newMode === "together") {
+      router.replace("/?mode=together", { scroll: false });
+    } else {
+      router.replace("/", { scroll: false });
+    }
   };
 
   const updateGroupUsername = (index: number, value: string) => {
@@ -719,7 +738,12 @@ function HomeInner() {
       className="flex items-center justify-between gap-3 text-sm bg-background/50 rounded-lg px-3 py-2"
     >
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-muted">{s.venue}</span>
+        <Link
+          href={`/venues/${venueNameToSlug(s.venue)}`}
+          className="text-muted hover:text-accent transition-colors"
+        >
+          {s.venue}
+        </Link>
         {postcodeCoords && !!VENUE_COORDS[s.venue] && (
           <span className="text-xs text-muted/60">
             {formatDistance(
@@ -1070,24 +1094,6 @@ function HomeInner() {
 
   return (
     <div className="flex-1">
-      <header className="border-b border-border">
-        <div className="max-w-4xl mx-auto px-4 py-6 flex items-center justify-between">
-          <button onClick={reset} className="cursor-pointer">
-            <h1 className="text-2xl font-bold tracking-tight">
-              <span className="text-accent">cine</span>boxd
-            </h1>
-          </button>
-          {state === "results" && (
-            <button
-              onClick={reset}
-              className="text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
-            >
-              New search
-            </button>
-          )}
-        </div>
-      </header>
-
       <main className="max-w-4xl mx-auto px-4 py-12">
         {state === "upload" && (
           <div className="flex flex-col items-center gap-8">
@@ -1261,6 +1267,16 @@ function HomeInner() {
 
         {state === "results" && data && (
           <div className="space-y-6">
+            {/* New search link */}
+            <div className="flex justify-end">
+              <button
+                onClick={reset}
+                className="text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
+              >
+                ← New search
+              </button>
+            </div>
+
             {/* Per-user error banner */}
             {data.userErrors && Object.keys(data.userErrors).length > 0 && (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-3">
@@ -1731,6 +1747,8 @@ function HomeInner() {
                 )}
               </>
             )}
+
+            <SupportCard compact />
           </div>
         )}
       </main>
