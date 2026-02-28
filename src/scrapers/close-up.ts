@@ -6,6 +6,10 @@ const URL = "https://www.closeupfilmcentre.com/film_programmes/";
 const CACHE_KEY = "close-up";
 const VENUE = "Close-Up Film Centre";
 
+// Timeout slightly under the scraper-level hard cap (25 s) so we get a
+// meaningful error message rather than a generic runWithTimeout rejection.
+const FETCH_TIMEOUT_MS = 18_000;
+
 function parseEntry(text: string): { date: string; time: string } | null {
   // Text like "Tue 17 Feb 8:15pm"
   const match = text.match(
@@ -48,7 +52,21 @@ export async function scrapeCloseUp(): Promise<Screening[]> {
   const cached = getCached<Screening[]>(CACHE_KEY);
   if (cached) return cached;
 
-  const res = await fetch(URL);
+  const res = await fetch(URL, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-GB,en;q=0.9",
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} ${res.statusText}`);
+  }
+
   const html = await res.text();
   const $ = cheerio.load(html);
   const screenings: Screening[] = [];
@@ -79,6 +97,10 @@ export async function scrapeCloseUp(): Promise<Screening[]> {
     });
   });
 
-  setCache(CACHE_KEY, screenings);
+  if (screenings.length > 0) {
+    setCache(CACHE_KEY, screenings);
+  } else {
+    console.warn("[close-up] parsed 0 screenings — HTML structure may have changed");
+  }
   return screenings;
 }
