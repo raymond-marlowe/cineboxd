@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { isEnabled } from "../feature-flags";
+import { isEnabled, flagState } from "../feature-flags";
 
 // Restore env after each test so they don't bleed into each other.
 afterEach(() => {
@@ -61,5 +61,25 @@ describe("isEnabled", () => {
   it('returns false for arbitrary unknown value like "enabled"', () => {
     process.env.__TEST_FLAG__ = "enabled";
     expect(isEnabled("__TEST_FLAG__")).toBe(false);
+  });
+});
+
+describe("flagState", () => {
+  it('returns "enabled" for truthy values', () => {
+    for (const val of ["true", "1", "yes", "on", "True", "YES"]) {
+      process.env.__TEST_FLAG__ = val;
+      expect(flagState("__TEST_FLAG__"), `expected enabled for "${val}"`).toBe("enabled");
+    }
+  });
+
+  it('returns "disabled_unset" when env var is not defined', () => {
+    expect(flagState("__TEST_FLAG__")).toBe("disabled_unset");
+  });
+
+  it('returns "disabled_false" when env var is defined but not truthy', () => {
+    for (const val of ["false", "0", "no", "off", "maybe", ""]) {
+      process.env.__TEST_FLAG__ = val;
+      expect(flagState("__TEST_FLAG__"), `expected disabled_false for "${val}"`).toBe("disabled_false");
+    }
   });
 });

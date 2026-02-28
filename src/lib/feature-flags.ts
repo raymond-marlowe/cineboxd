@@ -12,3 +12,17 @@ export function isEnabled(envKey: string): boolean {
   if (!raw) return false;
   return TRUTHY.has(raw.trim().toLowerCase());
 }
+
+/**
+ * Granular flag state — distinguishes "env var completely absent" from "env var
+ * present but set to a non-truthy value".  Used by scrapeAllWithBreakdown to
+ * produce a meaningful disabledReason in the status breakdown.
+ */
+export type FlagState = "enabled" | "disabled_false" | "disabled_unset";
+
+export function flagState(envKey: string): FlagState {
+  const raw = process.env[envKey];
+  if (raw === undefined) return "disabled_unset";
+  if (TRUTHY.has(raw.trim().toLowerCase())) return "enabled";
+  return "disabled_false";
+}
