@@ -13,9 +13,13 @@ export const dynamic = "force-dynamic";
 const SLOW_THRESHOLD_MS = 15_000;
 
 function getHealth(item: ScrapeBreakdown): {
-  label: "healthy" | "slow-or-empty" | "error";
+  label: "healthy" | "disabled" | "slow-or-empty" | "error";
   dotClass: string;
 } {
+  if (item.disabled) {
+    return { label: "disabled", dotClass: "bg-neutral-500" };
+  }
+
   if (item.error) {
     return { label: "error", dotClass: "bg-red-500" };
   }
@@ -85,13 +89,22 @@ export default async function StatusPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-foreground">
-                        <div>{item.name}</div>
+                        <div className={item.disabled ? "text-muted" : undefined}>
+                          {item.name}
+                          {item.disabled ? (
+                            <span className="ml-2 text-xs text-neutral-500">(disabled)</span>
+                          ) : null}
+                        </div>
                         {item.error ? (
                           <p className="mt-1 text-xs text-red-300">{item.error}</p>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3 text-muted">{item.count}</td>
-                      <td className="px-4 py-3 text-muted">{item.durationMs}ms</td>
+                      <td className="px-4 py-3 text-muted">
+                        {item.disabled ? "—" : item.count}
+                      </td>
+                      <td className="px-4 py-3 text-muted">
+                        {item.disabled ? "—" : `${item.durationMs}ms`}
+                      </td>
                     </tr>
                   );
                 })}

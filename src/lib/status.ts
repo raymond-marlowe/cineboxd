@@ -1,4 +1,5 @@
 import type { ScrapeBreakdown } from "@/scrapers";
+import { isEnabled } from "@/lib/feature-flags";
 import {
   IS_REDIS_CONFIGURED,
   SCRAPERS_BREAKDOWN_KEY,
@@ -11,6 +12,12 @@ export interface ScraperStatusSnapshot {
   updatedAt: string | null;
   breakdown: ScrapeBreakdown[] | null;
   note?: string;
+  /** Server-side flag state at time of request — never bundled into client JS. */
+  flags?: {
+    curzonOcapi: boolean;
+    picturehouse: boolean;
+    everyman: boolean;
+  };
 }
 
 function parseBreakdown(raw: unknown): ScrapeBreakdown[] | null {
@@ -59,7 +66,13 @@ export async function getScraperStatusSnapshot(): Promise<ScraperStatusSnapshot>
       };
     }
 
-    return { updatedAt, breakdown };
+    const flags = {
+      curzonOcapi: isEnabled("ENABLE_CURZON_OCAPI"),
+      picturehouse: isEnabled("ENABLE_PICTUREHOUSE"),
+      everyman: isEnabled("ENABLE_EVERYMAN"),
+    };
+
+    return { updatedAt, breakdown, flags };
   } catch {
     return {
       updatedAt: null,

@@ -1,5 +1,6 @@
 import { Screening } from "@/lib/types";
 import { getCached, setCache } from "@/lib/cache";
+import { isEnabled } from "@/lib/feature-flags";
 
 const CACHE_KEY = "picturehouse";
 const API_URL = "https://www.picturehouses.com/api/scheduled-movies-ajax";
@@ -151,8 +152,8 @@ async function fetchCinema(cinemaId: string, venueName: string): Promise<Screeni
 // ------- Main exported scraper ------------------------------------------
 
 export async function scrapePicturehouse(): Promise<Screening[]> {
-  // Feature flag: set ENABLE_PICTUREHOUSE=true in env to activate.
-  if (process.env.ENABLE_PICTUREHOUSE !== "true") return [];
+  // Feature flag: set ENABLE_PICTUREHOUSE=true (or 1/yes/on) in env to activate.
+  if (!isEnabled("ENABLE_PICTUREHOUSE")) return [];
 
   const cached = getCached<Screening[]>(CACHE_KEY);
   if (cached) return cached;

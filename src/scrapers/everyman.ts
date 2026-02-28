@@ -1,5 +1,6 @@
 import { Screening } from "@/lib/types";
 import { getCached, setCache } from "@/lib/cache";
+import { isEnabled } from "@/lib/feature-flags";
 
 const CACHE_KEY = "everyman";
 const SCHEDULE_URL =
@@ -218,8 +219,8 @@ async function fetchMovies(movieIds: string[]): Promise<EwMovieList> {
 // ------- Main exported scraper -------------------------------------------
 
 export async function scrapeEveryman(): Promise<Screening[]> {
-  // Feature flag: set ENABLE_EVERYMAN=true in env to activate.
-  if (process.env.ENABLE_EVERYMAN !== "true") return [];
+  // Feature flag: set ENABLE_EVERYMAN=true (or 1/yes/on) in env to activate.
+  if (!isEnabled("ENABLE_EVERYMAN")) return [];
 
   const cached = getCached<Screening[]>(CACHE_KEY);
   if (cached) return cached;

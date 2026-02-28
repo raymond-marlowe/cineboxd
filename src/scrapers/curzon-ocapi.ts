@@ -1,4 +1,5 @@
 import { Screening } from "@/lib/types";
+import { isEnabled } from "@/lib/feature-flags";
 
 const OCAPI_BASE = "https://vwc.curzon.com/WSVistaWebClient/ocapi/v1";
 const BOOKING_BASE = "https://www.curzon.com/ticketing/seats/";
@@ -196,8 +197,8 @@ async function fetchDateShowtimes(
 // ------- Main exported scraper ------------------------------------------
 
 export async function scrapeCurzonOcapi(): Promise<Screening[]> {
-  // Feature flag: set ENABLE_CURZON_OCAPI=true in env to activate.
-  if (process.env.ENABLE_CURZON_OCAPI !== "true") return [];
+  // Feature flag: set ENABLE_CURZON_OCAPI=true (or 1/yes/on) in env to activate.
+  if (!isEnabled("ENABLE_CURZON_OCAPI")) return [];
 
   const start = Date.now();
 

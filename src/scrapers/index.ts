@@ -1,4 +1,5 @@
 import { Screening } from "@/lib/types";
+import { isEnabled } from "@/lib/feature-flags";
 import { scrapePrinceCharles } from "./prince-charles";
 import { scrapeCloseUp } from "./close-up";
 import { scrapeICA } from "./ica";
@@ -34,7 +35,8 @@ export interface ScrapeBreakdown {
   count: number;
   durationMs: number;
   error?: string;
-  sample?: string; // first title seen — quick sanity-check in prod responses
+  sample?: string;   // first title seen — quick sanity-check in prod responses
+  disabled?: boolean; // true when the scraper was skipped due to a feature flag
 }
 
 // Hard ceiling per scraper: prevents a single hung scraper (e.g. olympic-cinema
@@ -71,7 +73,10 @@ async function runWithTimeout(
   }
 }
 
-const namedScrapers: { name: string; fn: Scraper }[] = [
+// envFlag: when set, the scraper is feature-flag-gated. scrapeAllWithBreakdown
+// checks the flag before calling the scraper and marks the entry as disabled
+// so /status can distinguish "flag off" from "ran but returned 0 results".
+const namedScrapers: { name: string; fn: Scraper; envFlag?: string }[] = [
   { name: "prince-charles",      fn: scrapePrinceCharles },
   { name: "close-up",            fn: scrapeCloseUp },
   { name: "ica",                 fn: scrapeICA },
@@ -87,9 +92,9 @@ const namedScrapers: { name: string; fn: Scraper }[] = [
   { name: "rich-mix",            fn: scrapeRichMix },
   { name: "jw3",                 fn: scrapeJW3 },
   { name: "curzon-veezi",        fn: scrapeCurzonVeezi },
-  { name: "curzon-ocapi",        fn: scrapeCurzonOcapi },
-  { name: "picturehouse",        fn: scrapePicturehouse },
-  { name: "everyman",            fn: scrapeEveryman },
+  { name: "curzon-ocapi",        fn: scrapeCurzonOcapi,  envFlag: "ENABLE_CURZON_OCAPI" },
+  { name: "picturehouse",        fn: scrapePicturehouse, envFlag: "ENABLE_PICTUREHOUSE" },
+  { name: "everyman",            fn: scrapeEveryman,     envFlag: "ENABLE_EVERYMAN" },
   { name: "bfi-southbank",       fn: scrapeBFISouthbank },
   { name: "cine-lumiere",        fn: scrapeCineLumiere },
   { name: "arzner",              fn: scrapeArzner },
@@ -105,26 +110,41 @@ const namedScrapers: { name: string; fn: Scraper }[] = [
 export const scrapers: Scraper[] = namedScrapers.map((s) => s.fn);
 
 export async function scrapeAllWithBreakdown(): Promise<{ screenings: Screening[]; breakdown: ScrapeBreakdown[] }> {
-  // All scrapers run concurrently; each is individually capped at SCRAPER_TIMEOUT_MS
-  // so the overall wall time ≤ SCRAPER_TIMEOUT_MS regardless of scraper count.
+  // Partition scrapers: disabled ones are recorded in the breakdown immediately
+  // (disabled: true) so /status can show a clear "flag off" state rather than
+  // an ambiguous count=0. Enabled scrapers run concurrently.
+  const enabledEntries: typeof namedScrapers = [];
+  const breakdown: ScrapeBreakdown[] = new Array(namedScrapers.length) as ScrapeBreakdown[];
+
+  for (let i = 0; i < namedScrapers.length; i++) {
+    const { name, fn, envFlag } = namedScrapers[i];
+    if (envFlag && !isEnabled(envFlag)) {
+      breakdown[i] = { name, count: 0, durationMs: 0, disabled: true };
+    } else {
+      enabledEntries.push({ name, fn, envFlag });
+    }
+  }
+
+  // Run enabled scrapers concurrently; each is individually capped at SCRAPER_TIMEOUT_MS.
   // runWithTimeout never rejects, so Promise.all is safe here.
   const results = await Promise.all(
-    namedScrapers.map(({ fn }) => runWithTimeout(fn, SCRAPER_TIMEOUT_MS))
+    enabledEntries.map(({ fn }) => runWithTimeout(fn, SCRAPER_TIMEOUT_MS))
   );
 
-  const breakdown: ScrapeBreakdown[] = [];
+  // Merge enabled results back into the pre-allocated breakdown array.
+  let enabledIdx = 0;
   const screenings: Screening[] = [];
-
-  for (let i = 0; i < results.length; i++) {
-    const { screenings: scraped, durationMs, error } = results[i];
+  for (let i = 0; i < namedScrapers.length; i++) {
+    if (breakdown[i]) continue; // already filled (disabled)
+    const { screenings: scraped, durationMs, error } = results[enabledIdx++];
     const { name } = namedScrapers[i];
-    breakdown.push({
+    breakdown[i] = {
       name,
       count: scraped.length,
       durationMs,
       ...(error ? { error } : {}),
       ...(scraped[0] ? { sample: scraped[0].title } : {}),
-    });
+    };
     screenings.push(...scraped);
   }
 
