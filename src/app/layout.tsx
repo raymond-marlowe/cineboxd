@@ -44,15 +44,13 @@ export default function RootLayout({
             <p className="text-sm font-medium text-foreground/80">
               Screening data may be inaccurate — always check the venue before booking
             </p>
-            <p className="text-xs text-muted">
-              Made by Alexander Nikolov
-              <span className="mx-1.5">&middot;</span>
-              <Link href="/about" className="hover:underline">
-                About
-              </Link>
-              <span className="mx-1.5">&middot;</span>
+            <p className="text-xs text-foreground/85 leading-relaxed">
               <Link href="/venues" className="hover:underline">
                 Supported venues
+              </Link>
+              <span className="mx-1.5">&middot;</span>
+              <Link href="/whats-on" className="hover:underline">
+                What&apos;s on
               </Link>
               <span className="mx-1.5">&middot;</span>
               <Link href="/suggest-a-cinema" className="hover:underline">
@@ -63,21 +61,30 @@ export default function RootLayout({
                 FAQ
               </Link>
               <span className="mx-1.5">&middot;</span>
-              <Link href="/contact" className="hover:underline">
-                Contact
+              <Link href="/about" className="hover:underline">
+                About
               </Link>
               <span className="mx-1.5">&middot;</span>
-              <Link href="/terms" className="hover:underline">
-                Terms
+              <Link href="/contact" className="hover:underline">
+                Contact
               </Link>
               <span className="mx-1.5">&middot;</span>
               <Link href="/status" className="hover:underline">
                 Status
               </Link>
               <span className="mx-1.5">&middot;</span>
+              <Link href="/terms" className="hover:underline">
+                Terms
+              </Link>
+              <span className="mx-1.5">&middot;</span>
               <Link href="/privacy" className="hover:underline">
                 Privacy
               </Link>
+            </p>
+            <p className="mt-2 text-xs text-muted/90">
+              Made by Alexander Nikolov
+              <span className="mx-1.5">&middot;</span>
+              Copyright &copy; 2026
             </p>
           </div>
         </footer>
