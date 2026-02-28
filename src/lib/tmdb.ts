@@ -1,11 +1,13 @@
 import { FilmMetadata } from "./types";
-import { getCached, setCache } from "./cache";
+import { getCached, setCacheWithTTL } from "./cache";
+import { trackedFetch } from "./perf-debug";
+import { TMDB_CACHE_KEY_VERSION, TMDB_METADATA_CACHE_TTL_MS } from "./constants";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
 function cacheKey(title: string, year: number | null): string {
   const normalized = title.toLowerCase().trim();
-  return `tmdb-${normalized}-${year ?? "unknown"}`;
+  return `tmdb:${TMDB_CACHE_KEY_VERSION}:${normalized}:${year ?? "unknown"}`;
 }
 
 async function tmdbFetch(path: string, params: Record<string, string> = {}) {
@@ -18,7 +20,7 @@ async function tmdbFetch(path: string, params: Record<string, string> = {}) {
     url.searchParams.set(k, v);
   }
 
-  const res = await fetch(url.toString());
+  const res = await trackedFetch(url.toString());
   if (!res.ok) return null;
   return res.json();
 }
@@ -44,7 +46,7 @@ export async function fetchFilmMetadata(
 
   const searchData = await tmdbFetch("/search/movie", searchParams);
   if (!searchData?.results?.length) {
-    setCache(key, empty);
+    setCacheWithTTL(key, empty, TMDB_METADATA_CACHE_TTL_MS);
     return empty;
   }
 
@@ -54,7 +56,7 @@ export async function fetchFilmMetadata(
   });
 
   if (!details) {
-    setCache(key, empty);
+    setCacheWithTTL(key, empty, TMDB_METADATA_CACHE_TTL_MS);
     return empty;
   }
 
@@ -71,6 +73,6 @@ export async function fetchFilmMetadata(
     imdbId: details.imdb_id || null,
   };
 
-  setCache(key, metadata);
+  setCacheWithTTL(key, metadata, TMDB_METADATA_CACHE_TTL_MS);
   return metadata;
 }

@@ -36,6 +36,62 @@ type UrlMode = "user" | "users" | "list";
 
 const USER_COLORS = ["#f59e0b", "#3b82f6", "#10b981", "#8b5cf6", "#ef4444"];
 
+interface FailedWatchlistPage {
+  pageNumber: number;
+  url: string;
+  reason: string;
+}
+
+interface MatchApiErrorObject {
+  code?: string;
+  message?: string;
+  details?: {
+    failedWatchlistPages?: FailedWatchlistPage[];
+    expired?: boolean;
+    userErrors?: Record<string, string>;
+  };
+}
+
+function getMatchApiErrorObject(json: unknown): MatchApiErrorObject | null {
+  if (!json || typeof json !== "object") return null;
+  const raw = (json as { error?: unknown }).error;
+  if (!raw || typeof raw !== "object") return null;
+  return raw as MatchApiErrorObject;
+}
+
+function isExpiredMatchError(json: unknown): boolean {
+  const errorObj = getMatchApiErrorObject(json);
+  if (errorObj?.details?.expired) return true;
+  return Boolean((json as { expired?: unknown })?.expired === true);
+}
+
+function getUserErrorsFromMatchError(json: unknown): Record<string, string> | undefined {
+  const errorObj = getMatchApiErrorObject(json);
+  return errorObj?.details?.userErrors;
+}
+
+function getMatchErrorMessage(status: number, json: unknown): string {
+  const errorObj = getMatchApiErrorObject(json);
+  const failedPages = errorObj?.details?.failedWatchlistPages ?? [];
+
+  if (status === 502) {
+    const pages = Array.from(new Set(failedPages.map((p) => p.pageNumber))).sort((a, b) => a - b);
+    if (pages.length > 0) {
+      return `Temporary issue fetching your Letterboxd watchlist. Please retry in a moment. Failed pages: ${pages.join(", ")}.`;
+    }
+    return "Temporary issue fetching your Letterboxd watchlist. Please retry in a moment.";
+  }
+
+  if (errorObj?.message) return errorObj.message;
+
+  const legacy = (json as { error?: unknown })?.error;
+  if (typeof legacy === "string" && legacy.trim()) {
+    return legacy;
+  }
+
+  return "Something went wrong";
+}
+
 function HomeInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -147,7 +203,7 @@ function HomeInner() {
         const json = await res.json();
 
         if (!res.ok) {
-          setError(json.error || "Something went wrong");
+          setError(getMatchErrorMessage(res.status, json));
           setState("upload");
           setLoadingUsername(null);
           return;
@@ -187,9 +243,10 @@ function HomeInner() {
         const json = await res.json();
 
         if (!res.ok) {
-          setError(json.error || "Something went wrong");
-          if (json.userErrors) {
-            setData((prev) => prev ? { ...prev, userErrors: json.userErrors } : null);
+          setError(getMatchErrorMessage(res.status, json));
+          const userErrors = getUserErrorsFromMatchError(json);
+          if (userErrors) {
+            setData((prev) => prev ? { ...prev, userErrors } : null);
           }
           setState("upload");
           setLoadingUsername(null);
@@ -225,12 +282,12 @@ function HomeInner() {
         const json = await res.json();
 
         if (!res.ok) {
-          if (json.expired) {
+          if (isExpiredMatchError(json)) {
             setError(
               "This shared link has expired. Ask the person who shared it to upload the CSV again."
             );
           } else {
-            setError(json.error || "Something went wrong");
+            setError(getMatchErrorMessage(res.status, json));
           }
           setState("upload");
           return;
@@ -343,7 +400,7 @@ function HomeInner() {
       const json = await res.json();
 
       if (!res.ok) {
-        setError(json.error || "Something went wrong");
+        setError(getMatchErrorMessage(res.status, json));
         setState("upload");
         return;
       }
