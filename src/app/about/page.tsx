@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import SupportCard from "@/components/SupportCard";
 
@@ -20,6 +21,19 @@ export default function AboutPage() {
             It was built with Next.js, a bit of AI help, and what remains of my brain. I am a chef living in London with my wife and cat. I have been frustrated with how hard it is to figure out what is currently showing at cinemas for years, and living in the glorious future means it’s surprisingly easy to solve this kind of problem yourself. I hope anyone who visits this site finds as useful as I found it fun to make.
           </p>
         </div>
+
+        <figure className="mx-auto max-w-md space-y-2">
+          <Image
+            src="/about/catgpt.png"
+            alt="A relaxed cat reclining on a chair"
+            width={1152}
+            height={1536}
+            className="w-full h-auto rounded-lg border border-border"
+          />
+          <figcaption className="text-center text-xs text-muted">
+            This site was made with CatGPT
+          </figcaption>
+        </figure>
 
         <SupportCard />
 
