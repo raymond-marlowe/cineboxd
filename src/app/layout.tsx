@@ -71,6 +71,10 @@ export default function RootLayout({
                 Terms
               </Link>
               <span className="mx-1.5">&middot;</span>
+              <Link href="/status" className="hover:underline">
+                Status
+              </Link>
+              <span className="mx-1.5">&middot;</span>
               <Link href="/privacy" className="hover:underline">
                 Privacy
               </Link>

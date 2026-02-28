@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scrapeAllWithBreakdown } from "@/scrapers";
-import { redis, SCREENINGS_KEY, SCREENINGS_UPDATED_KEY } from "@/lib/redis";
+import {
+  IS_REDIS_CONFIGURED,
+  SCRAPERS_BREAKDOWN_KEY,
+  SCRAPERS_BREAKDOWN_UPDATED_KEY,
+  SCREENINGS_KEY,
+  SCREENINGS_UPDATED_KEY,
+  redis,
+} from "@/lib/redis";
 import { Screening } from "@/lib/types";
 import { clearCache } from "@/lib/cache";
 
@@ -11,6 +18,15 @@ const TTL_24H = 86400; // seconds
 // scrapers) and preserve the existing cache rather than overwriting it.
 // Only applies when the existing cache has >500 screenings (i.e. is known-good).
 const SAFE_WRITE_THRESHOLD = 0.6;
+
+async function writeBreakdownStatus(updatedAt: string, breakdown: unknown) {
+  if (!IS_REDIS_CONFIGURED) return;
+
+  await Promise.all([
+    redis.set(SCRAPERS_BREAKDOWN_KEY, JSON.stringify(breakdown)),
+    redis.set(SCRAPERS_BREAKDOWN_UPDATED_KEY, updatedAt),
+  ]);
+}
 
 /** Health-check: returns cached screening count and last-updated timestamp. */
 export async function GET() {
@@ -92,6 +108,7 @@ export async function POST(request: NextRequest) {
       console.error(
         `[refresh] DEGRADED — new=${screenings.length} existing=${existingCount}: preserving existing cache`
       );
+      await writeBreakdownStatus(updatedAt, breakdown);
       return NextResponse.json({
         success: false,
         reason: "degraded — existing cache preserved",
@@ -107,6 +124,7 @@ export async function POST(request: NextRequest) {
     await Promise.all([
       redis.set(SCREENINGS_KEY, screenings, { ex: TTL_24H }),
       redis.set(SCREENINGS_UPDATED_KEY, updatedAt),
+      writeBreakdownStatus(updatedAt, breakdown),
     ]);
 
     return NextResponse.json({
