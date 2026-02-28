@@ -14,15 +14,10 @@ export default function AboutPage() {
 
         <div className="space-y-4 text-muted leading-relaxed">
           <p>
-            Cineboxd is a personal project that matches your Letterboxd
-            watchlist against what&apos;s currently showing at London&apos;s
-            independent and repertory cinemas.
+            Cineboxd is a personal project that matches your Letterboxd watchlist against upcoming screenings at London’s independent and repertory cinemas. I’m gradually expanding the list of venues, and I’d love to take it beyond London over time.
           </p>
           <p>
-            It was built with Next.js and Claude Code.
-          </p>
-          <p>
-            Uploaded watchlist files are processed in memory and not stored.
+            It was built with Next.js, a bit of AI help, and what remains of my brain. I am a chef living in London with my wife and cat. I have been frustrated with how hard it is to figure out what is currently showing at cinemas for years, and living in the glorious future means it’s surprisingly easy to solve this kind of problem yourself. I hope anyone who visits this site finds as useful as I found it fun to make.
           </p>
         </div>
 
@@ -38,4 +33,3 @@ export default function AboutPage() {
     </div>
   );
 }
-
