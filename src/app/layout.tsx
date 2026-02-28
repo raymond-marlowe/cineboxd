@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 import TopNav from "@/components/TopNav";
 
@@ -46,17 +47,33 @@ export default function RootLayout({
             <p className="text-xs text-muted">
               Made by Alexander Nikolov
               <span className="mx-1.5">&middot;</span>
-              <a href="/about" className="hover:underline">
+              <Link href="/about" className="hover:underline">
                 About
-              </a>
+              </Link>
               <span className="mx-1.5">&middot;</span>
-              <a href="/venues" className="hover:underline">
+              <Link href="/venues" className="hover:underline">
                 Supported venues
-              </a>
+              </Link>
               <span className="mx-1.5">&middot;</span>
-              <a href="/privacy" className="hover:underline">
+              <Link href="/suggest-a-cinema" className="hover:underline">
+                Suggest a cinema
+              </Link>
+              <span className="mx-1.5">&middot;</span>
+              <Link href="/faq" className="hover:underline">
+                FAQ
+              </Link>
+              <span className="mx-1.5">&middot;</span>
+              <Link href="/contact" className="hover:underline">
+                Contact
+              </Link>
+              <span className="mx-1.5">&middot;</span>
+              <Link href="/terms" className="hover:underline">
+                Terms
+              </Link>
+              <span className="mx-1.5">&middot;</span>
+              <Link href="/privacy" className="hover:underline">
                 Privacy
-              </a>
+              </Link>
             </p>
           </div>
         </footer>

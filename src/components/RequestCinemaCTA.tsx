@@ -1,5 +1,4 @@
-const FORM_URL =
-  "https://docs.google.com/forms/d/e/1FAIpQLSejESMRZbRJARsxYIJDb2mSQS9GyEPgCjzZsjMX8Y4w3RRPqg/viewform";
+import { SUGGEST_CINEMA_FORM_URL } from "@/lib/constants";
 
 export default function RequestCinemaCTA() {
   return (
@@ -11,10 +10,10 @@ export default function RequestCinemaCTA() {
         </p>
       </div>
       <a
-        href={FORM_URL}
+        href={SUGGEST_CINEMA_FORM_URL}
         target="_blank"
         rel="noreferrer noopener"
-        className="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-black hover:bg-accent/90 transition-colors"
+        className="inline-flex w-full sm:w-auto justify-center items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-black hover:bg-accent/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         Suggest a cinema →
       </a>
