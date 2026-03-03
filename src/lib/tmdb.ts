@@ -39,6 +39,7 @@ export async function fetchFilmMetadata(
     director: null,
     tmdbRating: null,
     imdbId: null,
+    releaseDate: null,
   };
 
   const searchParams: Record<string, string> = { query: title };
@@ -71,6 +72,7 @@ export async function fetchFilmMetadata(
     director,
     tmdbRating: details.vote_average ?? null,
     imdbId: details.imdb_id || null,
+    releaseDate: details.release_date || null,
   };
 
   setCacheWithTTL(key, metadata, TMDB_METADATA_CACHE_TTL_MS);

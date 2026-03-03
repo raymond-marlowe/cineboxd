@@ -61,17 +61,17 @@ describe("buildSoloUrl", () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildTogetherUrl
+// buildTogetherUrl — comma is the canonical separator
 // ---------------------------------------------------------------------------
 describe("buildTogetherUrl", () => {
-  it("builds /t/u1+u2", () =>
-    expect(buildTogetherUrl(["alice", "bob"])).toBe("/t/alice+bob"));
+  it("builds /t/u1,u2", () =>
+    expect(buildTogetherUrl(["alice", "bob"])).toBe("/t/alice,bob"));
 
   it("normalises to lowercase", () =>
-    expect(buildTogetherUrl(["Alice", "BOB"])).toBe("/t/alice+bob"));
+    expect(buildTogetherUrl(["Alice", "BOB"])).toBe("/t/alice,bob"));
 
   it("supports up to 5 users", () =>
-    expect(buildTogetherUrl(["a", "b", "c", "d", "e"])).toBe("/t/a+b+c+d+e"));
+    expect(buildTogetherUrl(["a", "b", "c", "d", "e"])).toBe("/t/a,b,c,d,e"));
 
   it("throws for fewer than 2 users", () =>
     expect(() => buildTogetherUrl(["alice"])).toThrow());
@@ -85,34 +85,39 @@ describe("buildTogetherUrl", () => {
   it("passes through non-identity query params", () =>
     expect(
       buildTogetherUrl(["alice", "bob"], new URLSearchParams("view=grid"))
-    ).toBe("/t/alice+bob?view=grid"));
+    ).toBe("/t/alice,bob?view=grid"));
 
   it("strips identity params but keeps other params", () =>
     // "users" is an identity param → stripped; "view" is UI state → kept
     expect(
       buildTogetherUrl(["alice", "bob"], new URLSearchParams("users=alice,bob&view=list"))
-    ).toBe("/t/alice+bob?view=list"));
+    ).toBe("/t/alice,bob?view=list"));
 });
 
 // ---------------------------------------------------------------------------
-// Together URL parsing round-trip (simulates what /t/[users]/page.tsx does)
+// Together URL parsing round-trip (mirrors src/app/t/[users]/page.tsx)
+// Canonical form uses comma; legacy forms (plus, space) are also accepted.
 // ---------------------------------------------------------------------------
 describe("together URL parsing round-trip", () => {
   const parseUsers = (raw: string) => {
-    const parts = raw.split("+").map((u) => normaliseLbUsername(u.trim()));
+    // Accept comma (canonical), plus, or space (some HTTP layers decode "+" in paths)
+    const parts = raw.split(/[,+ ]/).map((u) => normaliseLbUsername(u.trim())).filter(Boolean);
     if (parts.length < 2 || parts.length > 5) return null;
     if (!parts.every(isValidLbUsername)) return null;
     return parts;
   };
 
-  it("parses alice+bob", () => expect(parseUsers("alice+bob")).toEqual(["alice", "bob"]));
+  it("parses alice,bob (canonical comma form)", () =>
+    expect(parseUsers("alice,bob")).toEqual(["alice", "bob"]));
+  it("parses alice+bob (legacy plus form)", () =>
+    expect(parseUsers("alice+bob")).toEqual(["alice", "bob"]));
   it("parses three users", () =>
-    expect(parseUsers("alice+bob+charlie")).toEqual(["alice", "bob", "charlie"]));
+    expect(parseUsers("alice,bob,charlie")).toEqual(["alice", "bob", "charlie"]));
   it("returns null for a single user", () => expect(parseUsers("alice")).toBeNull());
   it("returns null for 6 users", () =>
-    expect(parseUsers("a+b+c+d+e+f")).toBeNull());
+    expect(parseUsers("a,b,c,d,e,f")).toBeNull());
   it("returns null for invalid username in group", () =>
-    expect(parseUsers("alice+bob-bad")).toBeNull());
+    expect(parseUsers("alice,bob-bad")).toBeNull());
   it("normalises uppercase", () =>
-    expect(parseUsers("Alice+BOB")).toEqual(["alice", "bob"]));
+    expect(parseUsers("Alice,BOB")).toEqual(["alice", "bob"]));
 });

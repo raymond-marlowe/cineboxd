@@ -59,7 +59,7 @@ export function buildTogetherUrl(
   }
 
   const qs = buildExtra(searchParams);
-  return `/t/${users.join("+")}${qs ? `?${qs}` : ""}`;
+  return `/t/${users.join(",")}${qs ? `?${qs}` : ""}`;
 }
 
 function buildExtra(searchParams?: SearchParamsLike): string {

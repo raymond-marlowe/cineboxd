@@ -16,7 +16,6 @@ import {
   VENUE_COORDS,
   distanceMiles,
   formatDistance,
-  nearestVenueDistance,
 } from "@/lib/venues";
 import {
   isValidLbUsername,
@@ -24,6 +23,12 @@ import {
   buildSoloUrl,
   buildTogetherUrl,
 } from "@/lib/urls";
+import {
+  type SortMode,
+  isComingSoon,
+  applyDiscoveryFilters,
+  type DiscoveryOptions,
+} from "@/lib/film-sort";
 
 interface MatchResponse {
   watchlistCount: number;
@@ -119,13 +124,6 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
   const [username, setUsername] = useState("");
   const [loadingUsername, setLoadingUsername] = useState<string | null>(null);
 
-  const [copied, setCopied] = useState(false);
-
-  // Weekly alerts state
-  const [alertEmail, setAlertEmail] = useState("");
-  const [alertState, setAlertState] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [alertError, setAlertError] = useState<string | null>(null);
-
   // Location / distance state
   const [postcode, setPostcode] = useState("");
   const [postcodeCoords, setPostcodeCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -133,6 +131,11 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
   const [postcodeError, setPostcodeError] = useState<string | null>(null);
   const [sortByDistance, setSortByDistance] = useState(false);
   const [maxDistanceMiles, setMaxDistanceMiles] = useState<number | null>(null);
+
+  // Discovery controls
+  const [sortMode, setSortMode] = useState<SortMode>("soonest");
+  const [filmSearch, setFilmSearch] = useState("");
+  const [hideUnreleased, setHideUnreleased] = useState(true);
 
   // Prevents double-fetch on React Strict Mode remount and on the navigate-first flow.
   const fetchInitiated = useRef(false);
@@ -180,7 +183,7 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
         if (urlMode === "user" && user) {
           nextPath = `/u/${user.toLowerCase()}`;
         } else if (urlMode === "users" && users && users.length > 0) {
-          nextPath = `/t/${users.map((u) => u.toLowerCase()).join("+")}`;
+          nextPath = `/t/${users.map((u) => u.toLowerCase()).join(",")}`;
         } else if (urlMode === "list" && listId) {
           nextPath = "/";
           params.set("list", listId);
@@ -425,6 +428,14 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
         setUsername(userParam);
         fetchForUsername(userParam);
       }
+
+      const seedParam = searchParams.get("seed");
+      const modeParam = searchParams.get("mode");
+      if (seedParam && isValidLbUsername(normaliseLbUsername(seedParam)) && modeParam === "together") {
+        setMode("together");
+        setGroupUsernames([normaliseLbUsername(seedParam), ""]);
+        // No auto-fetch — user fills in the second username
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -522,23 +533,6 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
     [handleFile]
   );
 
-  const reset = () => {
-    setState("upload");
-    setData(null);
-    setError(null);
-    setVenueFilter("all");
-    setViewMode("list");
-    setUsername("");
-    setLoadingUsername(null);
-    setMode("solo");
-    setGroupUsernames(["", ""]);
-    setPartialExpanded(false);
-    setAlertEmail("");
-    setAlertState("idle");
-    setAlertError(null);
-    router.replace("/");
-  };
-
   const switchMode = (newMode: InputMode) => {
     setMode(newMode);
     setError(null);
@@ -605,98 +599,38 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
     }
   }, [sharedMatches, partialMatches]);
 
-  const applyVenueFilter = useCallback(
-    (matches: MatchedScreening[]) =>
-      matches
-        .map((m) => ({
-          ...m,
-          screenings:
-            venueFilter === "all"
-              ? m.screenings
-              : m.screenings.filter((s) => s.venue === venueFilter),
-        }))
-        .filter((m) => m.screenings.length > 0),
-    [venueFilter]
-  );
-
   const isTogether = data?.totalUsers != null;
 
-  const filteredMatches = (() => {
-    if (!data) return undefined;
-    let result = applyVenueFilter(data.matches);
-    if (postcodeCoords && maxDistanceMiles !== null) {
-      const maxMi = maxDistanceMiles;
-      result = result
-        .map((m) => ({
-          ...m,
-          screenings: m.screenings.filter((s) => {
-            const vc = VENUE_COORDS[s.venue];
-            if (!vc) return true;
-            return distanceMiles(postcodeCoords.lat, postcodeCoords.lng, vc.lat, vc.lng) <= maxMi;
-          }),
-        }))
-        .filter((m) => m.screenings.length > 0);
-    }
-    if (postcodeCoords && sortByDistance) {
-      result = [...result].sort((a, b) => {
-        const dA = nearestVenueDistance(a.screenings, postcodeCoords.lat, postcodeCoords.lng);
-        const dB = nearestVenueDistance(b.screenings, postcodeCoords.lat, postcodeCoords.lng);
-        return dA - dB;
-      });
-    }
-    return result;
-  })();
-  const filteredShared = (() => {
-    if (!sharedMatches) return undefined;
-    let result = applyVenueFilter(sharedMatches);
-    if (postcodeCoords && maxDistanceMiles !== null) {
-      const maxMi = maxDistanceMiles;
-      result = result
-        .map((m) => ({
-          ...m,
-          screenings: m.screenings.filter((s) => {
-            const vc = VENUE_COORDS[s.venue];
-            if (!vc) return true;
-            return distanceMiles(postcodeCoords.lat, postcodeCoords.lng, vc.lat, vc.lng) <= maxMi;
-          }),
-        }))
-        .filter((m) => m.screenings.length > 0);
-    }
-    if (postcodeCoords && sortByDistance) {
-      result = [...result].sort((a, b) => {
-        const dA = nearestVenueDistance(a.screenings, postcodeCoords.lat, postcodeCoords.lng);
-        const dB = nearestVenueDistance(b.screenings, postcodeCoords.lat, postcodeCoords.lng);
-        return dA - dB;
-      });
-    }
-    return result;
-  })();
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  const filteredPartial = (() => {
-    if (!partialMatches) return undefined;
-    let result = applyVenueFilter(partialMatches);
-    if (postcodeCoords && maxDistanceMiles !== null) {
-      const maxMi = maxDistanceMiles;
-      result = result
-        .map((m) => ({
-          ...m,
-          screenings: m.screenings.filter((s) => {
-            const vc = VENUE_COORDS[s.venue];
-            if (!vc) return true;
-            return distanceMiles(postcodeCoords.lat, postcodeCoords.lng, vc.lat, vc.lng) <= maxMi;
-          }),
-        }))
-        .filter((m) => m.screenings.length > 0);
-    }
-    if (postcodeCoords && sortByDistance) {
-      result = [...result].sort((a, b) => {
-        const dA = nearestVenueDistance(a.screenings, postcodeCoords.lat, postcodeCoords.lng);
-        const dB = nearestVenueDistance(b.screenings, postcodeCoords.lat, postcodeCoords.lng);
-        return dA - dB;
-      });
-    }
-    return result;
-  })();
+  const discoveryOpts = useMemo<DiscoveryOptions>(
+    () => ({
+      sortMode,
+      filmSearch,
+      hideUnreleased,
+      venueFilter,
+      postcodeCoords,
+      sortByDistance,
+      maxDistanceMiles,
+      today,
+    }),
+    [sortMode, filmSearch, hideUnreleased, venueFilter, postcodeCoords, sortByDistance, maxDistanceMiles, today]
+  );
+
+  const filteredMatches = useMemo(
+    () => (data ? applyDiscoveryFilters(data.matches, discoveryOpts) : undefined),
+    [data, discoveryOpts]
+  );
+
+  const filteredShared = useMemo(
+    () => (sharedMatches ? applyDiscoveryFilters(sharedMatches, discoveryOpts) : undefined),
+    [sharedMatches, discoveryOpts]
+  );
+
+  const filteredPartial = useMemo(
+    () => (partialMatches ? applyDiscoveryFilters(partialMatches, discoveryOpts) : undefined),
+    [partialMatches, discoveryOpts]
+  );
 
   // Flattened screenings for the calendar view
   // In together mode use filteredShared (intersection only) to match the list view
@@ -717,16 +651,6 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
     },
     []
   );
-
-  const handleDownloadAllIcs = useCallback(() => {
-    if (!filteredMatches) return;
-    const events = filteredMatches.flatMap((m) =>
-      m.screenings.map((s) => generateIcsEvent(s, m.film.title))
-    );
-    if (events.length === 0) return;
-    const content = generateIcsFile(events);
-    downloadIcs(content, "cineboxd-screenings.ics");
-  }, [filteredMatches]);
 
   const geocodePostcode = useCallback(async (pc: string) => {
     const clean = pc.trim().replace(/\s+/g, "");
@@ -767,37 +691,6 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
     localStorage.removeItem("cineboxd_postcode");
   }, []);
 
-  const handleShare = useCallback(() => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, []);
-
-  const handleSubscribe = useCallback(
-    async (email: string) => {
-      setAlertState("loading");
-      setAlertError(null);
-      try {
-        const res = await fetch("/api/subscribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, username }),
-        });
-        const json = await res.json();
-        if (!res.ok) {
-          setAlertState("error");
-          setAlertError(json.error || "Something went wrong");
-        } else {
-          setAlertState("success");
-        }
-      } catch {
-        setAlertState("error");
-        setAlertError("Failed to connect to server");
-      }
-    },
-    [username]
-  );
-
   const renderUserDots = (users?: string[]) => {
     if (!users || !isTogether) return null;
     return (
@@ -815,67 +708,120 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
     );
   };
 
-  const renderLocationControls = () => (
-    <div className="flex flex-wrap items-center gap-3">
-      <form
-        onSubmit={(e) => { e.preventDefault(); geocodePostcode(postcode); }}
-        className="flex items-center gap-2"
-      >
-        <span className="text-sm text-muted shrink-0">Near</span>
-        <input
-          type="text"
-          value={postcode}
-          onChange={(e) => setPostcode(e.target.value.toUpperCase())}
-          placeholder="Postcode"
-          maxLength={8}
-          className="w-24 bg-card border border-border rounded-lg px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
-        />
-        <button
-          type="submit"
-          disabled={postcodeLoading || !postcode.trim()}
-          className="bg-card border border-border rounded-lg px-3 py-1.5 text-sm text-muted hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+  const renderControlBar = () => (
+    <div className="bg-background/40 border border-border/30 rounded-lg px-3 py-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+      {/* LEFT: location + venue */}
+      <div className="flex flex-wrap items-center gap-2">
+        <form
+          onSubmit={(e) => { e.preventDefault(); geocodePostcode(postcode); }}
+          className="flex items-center gap-1.5"
         >
-          {postcodeLoading ? "..." : "Go"}
-        </button>
-        {postcodeCoords && (
+          <span className="text-xs text-muted shrink-0">Near</span>
+          <input
+            type="text"
+            value={postcode}
+            onChange={(e) => setPostcode(e.target.value.toUpperCase())}
+            placeholder="Postcode"
+            maxLength={8}
+            className="w-20 bg-card border border-border rounded-lg px-2 py-1 text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+          />
           <button
-            type="button"
-            onClick={clearPostcode}
-            className="text-xs text-muted hover:text-foreground transition-colors cursor-pointer"
+            type="submit"
+            disabled={postcodeLoading || !postcode.trim()}
+            className="bg-card border border-border rounded-lg px-2 py-1 text-sm text-muted hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
           >
-            Clear
+            {postcodeLoading ? "…" : "Go"}
           </button>
-        )}
-      </form>
-      {postcodeCoords && (
-        <>
-          <label className="flex items-center gap-1.5 text-sm text-muted cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={sortByDistance}
-              onChange={(e) => setSortByDistance(e.target.checked)}
-            />
-            Sort by distance
-          </label>
+          {postcodeCoords && (
+            <button
+              type="button"
+              onClick={clearPostcode}
+              className="text-xs text-muted hover:text-foreground transition-colors cursor-pointer"
+            >
+              Clear
+            </button>
+          )}
+        </form>
+        <select
+          value={maxDistanceMiles ?? ""}
+          onChange={(e) => setMaxDistanceMiles(e.target.value ? Number(e.target.value) : null)}
+          disabled={!postcodeCoords}
+          className="bg-card border border-border rounded-lg px-2 py-1 text-sm disabled:opacity-40 cursor-pointer disabled:cursor-default"
+        >
+          <option value="">Any distance</option>
+          <option value="1">≤ 1 mile</option>
+          <option value="2">≤ 2 miles</option>
+          <option value="3">≤ 3 miles</option>
+          <option value="5">≤ 5 miles</option>
+          <option value="10">≤ 10 miles</option>
+        </select>
+        <label className="flex items-center gap-1 text-xs text-muted cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={sortByDistance}
+            disabled={!postcodeCoords}
+            onChange={(e) => setSortByDistance(e.target.checked)}
+            className="disabled:opacity-40"
+          />
+          By dist.
+        </label>
+        {venues.length > 1 && (
           <select
-            value={maxDistanceMiles ?? ""}
-            onChange={(e) =>
-              setMaxDistanceMiles(e.target.value ? Number(e.target.value) : null)
-            }
-            className="bg-card border border-border rounded-lg px-3 py-1.5 text-sm"
+            value={venueFilter}
+            onChange={(e) => setVenueFilter(e.target.value)}
+            className="bg-card border border-border rounded-lg px-2 py-1 text-sm cursor-pointer"
           >
-            <option value="">Any distance</option>
-            <option value="1">≤ 1 mile</option>
-            <option value="2">≤ 2 miles</option>
-            <option value="3">≤ 3 miles</option>
-            <option value="5">≤ 5 miles</option>
-            <option value="10">≤ 10 miles</option>
+            <option value="all">All venues</option>
+            {venues.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
           </select>
-        </>
-      )}
-      {postcodeError && (
-        <span className="text-sm text-red-400">{postcodeError}</span>
-      )}
+        )}
+        {postcodeError && (
+          <span className="text-xs text-red-400">{postcodeError}</span>
+        )}
+      </div>
+
+      {/* RIGHT: film controls */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={filmSearch}
+          onChange={(e) => setFilmSearch(e.target.value)}
+          placeholder="Search films"
+          className="bg-card border border-border rounded-lg px-2 py-1 text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent transition-colors w-32"
+        />
+        <select
+          value={sortMode}
+          onChange={(e) => setSortMode(e.target.value as SortMode)}
+          className="bg-card border border-border rounded-lg px-2 py-1 text-sm cursor-pointer"
+        >
+          <optgroup label="Screening">
+            <option value="soonest">Earliest screening</option>
+            <option value="latest">Latest screening</option>
+          </optgroup>
+          <optgroup label="Title">
+            <option value="title_asc">Title A–Z</option>
+            <option value="title_desc">Title Z–A</option>
+          </optgroup>
+          <optgroup label="Release">
+            <option value="year_desc">Release date (newest)</option>
+            <option value="year_asc">Release date (earliest)</option>
+          </optgroup>
+          <optgroup label="Rating">
+            <option value="rating_desc">Rating (highest)</option>
+            <option value="rating_asc">Rating (lowest)</option>
+          </optgroup>
+        </select>
+        <label className="flex items-center gap-1 text-xs text-muted cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={hideUnreleased}
+            onChange={(e) => setHideUnreleased(e.target.checked)}
+          />
+          Hide unreleased
+        </label>
+      </div>
     </div>
   );
 
@@ -1060,6 +1006,12 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
               )}
             </h3>
 
+            {isComingSoon(match, today) && (
+              <span className="inline-block text-xs font-medium bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full mt-1">
+                Coming soon
+              </span>
+            )}
+
             {renderUserDots(match.users)}
 
             {meta?.director && (
@@ -1241,7 +1193,7 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
 
   return (
     <div className="flex-1">
-      <main className="max-w-4xl mx-auto px-4 py-12">
+      <main className={`max-w-4xl mx-auto px-4 ${state === "results" ? "pt-4 pb-12" : "py-12"}`}>
         {state === "upload" && (
           <div className="flex flex-col items-center gap-8">
             <div className="text-center space-y-3">
@@ -1413,17 +1365,7 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
         )}
 
         {state === "results" && data && (
-          <div className="space-y-6">
-            {/* New search link */}
-            <div className="flex justify-end">
-              <button
-                onClick={reset}
-                className="text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
-              >
-                ← New search
-              </button>
-            </div>
-
+          <div className="space-y-4">
             {/* Per-user error banner */}
             {data.userErrors && Object.keys(data.userErrors).length > 0 && (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-3">
@@ -1438,115 +1380,57 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
             {isTogether ? (
               /* Together mode results */
               <>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-2xl font-semibold">
+                <div className="space-y-2">
+                {/* Heading bar: count + view tabs */}
+                <div className="flex items-center justify-between gap-4 pb-2 border-b border-border/50">
+                  <div className="flex items-center gap-3 flex-wrap min-w-0">
+                    <h2 className="text-2xl font-semibold shrink-0">
                       {filteredShared?.length ?? 0} shared film
                       {filteredShared?.length !== 1 ? "s" : ""} found
                     </h2>
-                    <p className="text-sm text-muted">
-                      Checked {data.watchlistCount} watchlist films against{" "}
-                      {data.screeningsScraped} screenings
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    {venues.length > 1 && (
-                      <select
-                        value={venueFilter}
-                        onChange={(e) => setVenueFilter(e.target.value)}
-                        className="bg-card border border-border rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value="all">All venues</option>
-                        {venues.map((v) => (
-                          <option key={v} value={v}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
+                    {groupUsernames.filter(Boolean).length > 0 && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-accent/15 text-accent border border-accent/20">
+                        {groupUsernames.filter(Boolean).join(" + ")}
+                        <button
+                          type="button"
+                          onClick={() => { setState("upload"); router.push("/"); }}
+                          className="hover:text-foreground transition-colors cursor-pointer leading-none ml-0.5"
+                          aria-label="Clear search"
+                        >×</button>
+                      </span>
                     )}
-
-                    <div className="inline-flex flex-none shrink-0 rounded-lg border border-border overflow-hidden">
-                      <button
-                        onClick={() => handleViewChange("list")}
-                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
-                          viewMode === "list"
-                            ? "bg-accent text-background font-medium"
-                            : "bg-card text-muted hover:text-foreground"
-                        }`}
-                      >
-                        List
-                      </button>
-                      <button
-                        onClick={() => handleViewChange("grid")}
-                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
-                          viewMode === "grid"
-                            ? "bg-accent text-background font-medium"
-                            : "bg-card text-muted hover:text-foreground"
-                        }`}
-                      >
-                        Grid
-                      </button>
-                      <button
-                        onClick={() => handleViewChange("calendar")}
-                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
-                          viewMode === "calendar"
-                            ? "bg-accent text-background font-medium"
-                            : "bg-card text-muted hover:text-foreground"
-                        }`}
-                      >
-                        Calendar
-                      </button>
-                      <button
-                        onClick={() => handleViewChange("map")}
-                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
-                          viewMode === "map"
-                            ? "bg-accent text-background font-medium"
-                            : "bg-card text-muted hover:text-foreground"
-                        }`}
-                      >
-                        Map
-                      </button>
-                    </div>
-
+                  </div>
+                  <div className="inline-flex flex-none shrink-0 rounded-lg border border-border overflow-hidden">
                     <button
-                      onClick={handleDownloadAllIcs}
-                      className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-3 py-2 text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
-                      title="Download all screenings as ICS"
+                      onClick={() => handleViewChange("list")}
+                      className={`px-3 py-2 text-sm min-w-[60px] whitespace-nowrap transition-colors cursor-pointer ${viewMode === "list" ? "bg-accent text-background font-medium" : "bg-card text-muted hover:text-foreground"}`}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                      </svg>
-                      Export all
+                      List
                     </button>
-
                     <button
-                      onClick={handleShare}
-                      className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-3 py-2 text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
-                      title="Copy shareable link"
+                      onClick={() => handleViewChange("grid")}
+                      className={`px-3 py-2 text-sm min-w-[60px] whitespace-nowrap transition-colors cursor-pointer ${viewMode === "grid" ? "bg-accent text-background font-medium" : "bg-card text-muted hover:text-foreground"}`}
                     >
-                      {copied ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="18" cy="5" r="3" />
-                          <circle cx="6" cy="12" r="3" />
-                          <circle cx="18" cy="19" r="3" />
-                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                        </svg>
-                      )}
-                      {copied ? "Link copied!" : "Share"}
+                      Grid
+                    </button>
+                    <button
+                      onClick={() => handleViewChange("calendar")}
+                      className={`px-3 py-2 text-sm min-w-[60px] whitespace-nowrap transition-colors cursor-pointer ${viewMode === "calendar" ? "bg-accent text-background font-medium" : "bg-card text-muted hover:text-foreground"}`}
+                    >
+                      Calendar
+                    </button>
+                    <button
+                      onClick={() => handleViewChange("map")}
+                      className={`px-3 py-2 text-sm min-w-[60px] whitespace-nowrap transition-colors cursor-pointer ${viewMode === "map" ? "bg-accent text-background font-medium" : "bg-card text-muted hover:text-foreground"}`}
+                    >
+                      Map
                     </button>
                   </div>
                 </div>
 
-                {/* Location filter — postcode, sort by distance, max distance */}
-                {renderLocationControls()}
+                {/* Control bar: all filters in one row */}
+                {renderControlBar()}
+                </div>
 
                 {viewMode === "calendar" ? (
                   <Calendar
@@ -1672,181 +1556,68 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
                 )}
               </>
             ) : (
-              /* Solo mode results — unchanged */
+              /* Solo mode results */
               <>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-2xl font-semibold">
+                <div className="space-y-2">
+                {/* Heading bar: count + view tabs */}
+                <div className="flex items-center justify-between gap-4 pb-2 border-b border-border/50">
+                  <div className="flex items-center gap-3 flex-wrap min-w-0">
+                    <h2 className="text-2xl font-semibold shrink-0">
                       {filteredMatches?.length ?? 0} film
                       {filteredMatches?.length !== 1 ? "s" : ""} found
                     </h2>
-                    <p className="text-sm text-muted">
-                      Checked {data.watchlistCount} watchlist films against{" "}
-                      {data.screeningsScraped} screenings
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    {venues.length > 1 && (
-                      <select
-                        value={venueFilter}
-                        onChange={(e) => setVenueFilter(e.target.value)}
-                        className="bg-card border border-border rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value="all">All venues</option>
-                        {venues.map((v) => (
-                          <option key={v} value={v}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
+                    {username && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-accent/15 text-accent border border-accent/20">
+                        {username}
+                        <button
+                          type="button"
+                          onClick={() => { setState("upload"); router.push("/"); }}
+                          className="hover:text-foreground transition-colors cursor-pointer leading-none ml-0.5"
+                          aria-label="Clear search"
+                        >×</button>
+                      </span>
                     )}
-
-                    <div className="inline-flex flex-none shrink-0 rounded-lg border border-border overflow-hidden">
+                    {username && (
                       <button
-                        onClick={() => handleViewChange("list")}
-                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
-                          viewMode === "list"
-                            ? "bg-accent text-background font-medium"
-                            : "bg-card text-muted hover:text-foreground"
-                        }`}
+                        type="button"
+                        onClick={() => router.push(`/?mode=together&seed=${encodeURIComponent(username)}`)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm border border-border text-muted hover:text-foreground hover:border-accent/50 transition-colors cursor-pointer shrink-0"
                       >
-                        List
+                        + Add username
                       </button>
-                      <button
-                        onClick={() => handleViewChange("grid")}
-                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
-                          viewMode === "grid"
-                            ? "bg-accent text-background font-medium"
-                            : "bg-card text-muted hover:text-foreground"
-                        }`}
-                      >
-                        Grid
-                      </button>
-                      <button
-                        onClick={() => handleViewChange("calendar")}
-                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
-                          viewMode === "calendar"
-                            ? "bg-accent text-background font-medium"
-                            : "bg-card text-muted hover:text-foreground"
-                        }`}
-                      >
-                        Calendar
-                      </button>
-                      <button
-                        onClick={() => handleViewChange("map")}
-                        className={`px-3 py-2 text-sm min-w-[76px] whitespace-nowrap transition-colors cursor-pointer ${
-                          viewMode === "map"
-                            ? "bg-accent text-background font-medium"
-                            : "bg-card text-muted hover:text-foreground"
-                        }`}
-                      >
-                        Map
-                      </button>
-                    </div>
-
+                    )}
+                  </div>
+                  <div className="inline-flex flex-none shrink-0 rounded-lg border border-border overflow-hidden">
                     <button
-                      onClick={handleDownloadAllIcs}
-                      className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-3 py-2 text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
-                      title="Download all screenings as ICS"
+                      onClick={() => handleViewChange("list")}
+                      className={`px-3 py-2 text-sm min-w-[60px] whitespace-nowrap transition-colors cursor-pointer ${viewMode === "list" ? "bg-accent text-background font-medium" : "bg-card text-muted hover:text-foreground"}`}
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                      </svg>
-                      Export all
+                      List
                     </button>
-
                     <button
-                      onClick={handleShare}
-                      className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-3 py-2 text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
-                      title="Copy shareable link"
+                      onClick={() => handleViewChange("grid")}
+                      className={`px-3 py-2 text-sm min-w-[60px] whitespace-nowrap transition-colors cursor-pointer ${viewMode === "grid" ? "bg-accent text-background font-medium" : "bg-card text-muted hover:text-foreground"}`}
                     >
-                      {copied ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="18" cy="5" r="3" />
-                          <circle cx="6" cy="12" r="3" />
-                          <circle cx="18" cy="19" r="3" />
-                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                        </svg>
-                      )}
-                      {copied ? "Link copied!" : "Share"}
+                      Grid
+                    </button>
+                    <button
+                      onClick={() => handleViewChange("calendar")}
+                      className={`px-3 py-2 text-sm min-w-[60px] whitespace-nowrap transition-colors cursor-pointer ${viewMode === "calendar" ? "bg-accent text-background font-medium" : "bg-card text-muted hover:text-foreground"}`}
+                    >
+                      Calendar
+                    </button>
+                    <button
+                      onClick={() => handleViewChange("map")}
+                      className={`px-3 py-2 text-sm min-w-[60px] whitespace-nowrap transition-colors cursor-pointer ${viewMode === "map" ? "bg-accent text-background font-medium" : "bg-card text-muted hover:text-foreground"}`}
+                    >
+                      Map
                     </button>
                   </div>
                 </div>
 
-                {/* Location filter — postcode, sort by distance, max distance */}
-                {renderLocationControls()}
-
-                {/* CSV upload nudge */}
-                {!username && (
-                  <p className="text-sm text-muted">
-                    Want weekly alerts?{" "}
-                    <button
-                      onClick={reset}
-                      className="underline hover:text-foreground transition-colors cursor-pointer"
-                    >
-                      Search by Letterboxd username instead.
-                    </button>
-                  </p>
-                )}
-
-                {/* Weekly alerts — compact strip between controls and results */}
-                {username && (
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-border bg-card px-4 py-3">
-                    {alertState === "success" ? (
-                      <p className="text-sm text-green-400">
-                        Subscribed! You&apos;ll get a weekly email when your watchlist is screening.
-                      </p>
-                    ) : (
-                      <>
-                        <span className="text-sm text-muted shrink-0">Get weekly alerts</span>
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            handleSubscribe(alertEmail);
-                          }}
-                          className="flex flex-1 gap-2"
-                        >
-                          <input
-                            type="email"
-                            value={alertEmail}
-                            onChange={(e) => setAlertEmail(e.target.value)}
-                            placeholder="your@email.com"
-                            required
-                            className="flex-1 min-w-0 bg-background border border-border rounded-lg px-3 py-1.5 text-foreground placeholder:text-muted focus:outline-none focus:border-accent transition-colors text-sm"
-                          />
-                          <button
-                            type="submit"
-                            disabled={alertState === "loading"}
-                            className="bg-accent text-background font-medium px-3 py-1.5 rounded-lg hover:bg-accent/90 transition-colors cursor-pointer text-sm shrink-0 disabled:opacity-50"
-                          >
-                            {alertState === "loading" ? "..." : "Subscribe"}
-                          </button>
-                        </form>
-                        {alertError && (
-                          <p className="text-red-400 text-sm shrink-0">{alertError}</p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
+                {/* Control bar: all filters in one row */}
+                {renderControlBar()}
+                </div>
 
                 {viewMode === "calendar" ? (
                   <Calendar
@@ -1894,6 +1665,11 @@ function HomeContentInner({ initialUsername, initialUsernames }: HomeContentProp
                 )}
               </>
             )}
+
+            <p className="text-xs text-muted">
+              Search stats: Checked {data.watchlistCount} watchlist films against{" "}
+              {data.screeningsScraped} screenings
+            </p>
 
             <SupportCard compact />
           </div>

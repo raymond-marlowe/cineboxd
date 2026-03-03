@@ -20,6 +20,7 @@ export interface FilmMetadata {
   director: string | null;
   tmdbRating: number | null;
   imdbId: string | null;
+  releaseDate?: string | null;
 }
 
 export interface MatchedScreening {
