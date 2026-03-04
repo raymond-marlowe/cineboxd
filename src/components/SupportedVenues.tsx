@@ -77,6 +77,8 @@ export const SUPPORTED_VENUES: Venue[] = [
   { name: "The Cinema in the Power Station", url: "https://www.thecinemainthepowerstation.com/whats-on" },
   { name: "The Cinema at Selfridges",        url: "https://www.thecinemaatselfridges.com/whats-on" },
   { name: "Chiswick Cinema",                 url: "https://www.chiswickcinema.co.uk/whats-on" },
+  { name: "Electric Cinema Portobello",      url: "https://www.electriccinema.co.uk/portobello/" },
+  { name: "Electric Cinema White City",      url: "https://www.electriccinema.co.uk/white-city/" },
 ];
 
 const CLAMP = 10;

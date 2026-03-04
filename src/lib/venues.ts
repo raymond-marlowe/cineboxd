@@ -58,6 +58,8 @@ export const VENUE_COORDS: Record<string, VenueCoords> = {
   "The Cinema in the Power Station": { lat: 51.4810, lng: -0.1449 }, // Circus Rd W, Battersea Power Station, SW11 8DD
   "The Cinema at Selfridges": { lat: 51.5144, lng: -0.1520 }, // 400 Oxford St, W1A 1AB
   "Chiswick Cinema":       { lat: 51.4921, lng: -0.2668 }, // 94-96 Chiswick High Rd, W4 1SH
+  "Electric Cinema Portobello": { lat: 51.5170, lng: -0.2041 }, // 191 Portobello Rd, W11 2ED
+  "Electric Cinema White City": { lat: 51.5100, lng: -0.2250 }, // 2 Television Centre, 101 Wood Lane, W12 7FR
   // Everyman venues (ENABLE_EVERYMAN scraper)
   "Everyman Baker Street":          { lat: 51.5225, lng: -0.1573 }, // 96-98 Baker St, W1U 6TJ
   "Everyman Barnet":                { lat: 51.6479, lng: -0.2063 }, // The Spires, High St, EN5 5XY
